@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Warframe Dock</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --orange: #d29922;
+    --red: #f85149;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--bg);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.4;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    user-select: none;
+    display: flex;
+    justify-content: center;
+  }
+  .dock {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    max-width: 100%;
+    padding: 10px;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-weight: 700;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  .logo-icon {
+    width: 20px;
+    height: 20px;
+    background: linear-gradient(135deg, #58a6ff, #3fb950);
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: #0d1117;
+    flex-shrink: 0;
+  }
+  .tabs {
+    display: flex;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 2px;
+    flex-shrink: 0;
+  }
+  .tab {
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted);
+    cursor: pointer;
+    transition: 0.15s;
+    white-space: nowrap;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active {
+    background: rgba(88,166,255,0.15);
+    color: var(--accent);
+  }
+  .summary {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-shrink: 0;
+  }
+  .summary.hidden { display: none; }
+  .summary-item {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 10px;
+    min-width: 0;
+  }
+  .summary-label {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 2px;
+  }
+  .summary-value {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .summary-bar {
+    height: 3px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .summary-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.35s ease;
+  }
+  .summary-fill.daily { background: linear-gradient(90deg, #1f6feb, #58a6ff); }
+  .summary-fill.weekly { background: linear-gradient(90deg, #238636, #3fb950); }
+  .tasks {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: #30363d transparent;
+  }
+  .tasks.hidden { display: none; }
+  .tasks::-webkit-scrollbar { width: 5px; }
+  .tasks::-webkit-scrollbar-track { background: transparent; }
+  .tasks::-webkit-scrollbar-thumb {
+    background: #30363d;
+    border-radius: 3px;
+  }
+  .tasks::-webkit-scrollbar-thumb:hover { background: #484f58; }
+  .task {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: 0.12s;
+    flex-shrink: 0;
+  }
+  .task:hover {
+    border-color: rgba(88,166,255,0.4);
+    background: #1c2129;
+  }
+  .task.done { opacity: 0.45; }
+  .task.done .task-name {
+    text-decoration: line-through;
+    color: var(--muted);
+  }
+  .checkbox {
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: transparent;
+    transition: 0.15s;
+    flex-shrink: 0;
+  }
+  .task.done .checkbox {
+    background: var(--green);
+    border-color: var(--green);
+    color: #0d1117;
+  }
+  .task-info { flex: 1; min-width: 0; }
+  .task-name {
+    font-weight: 500;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .task-goal {
+    font-size: 11px;
+    color: var(--orange);
+    margin-top: 1px;
+  }
+  .task-actions {
+    display: flex;
+    gap: 3px;
+    opacity: 0;
+    transition: opacity 0.12s;
+    flex-shrink: 0;
+  }
+  .task:hover .task-actions { opacity: 1; }
+  .action-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 5px;
+    border: none;
+    background: rgba(255,255,255,0.06);
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.12s;
+  }
+  .action-btn:hover { background: rgba(255,255,255,0.12); color: var(--text); }
+  .action-btn.delete:hover { background: rgba(248,81,73,0.2); color: var(--red); }
+  .footer {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .footer.hidden { display: none; }
+  .btn {
+    flex: 1;
+    padding: 6px 0;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: 0.15s;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .btn:hover {
+    background: #1c2129;
+    color: var(--text);
+  }
+  .btn.primary {
+    background: rgba(88,166,255,0.1);
+    border-color: rgba(88,166,255,0.3);
+    color: var(--accent);
+  }
+  .btn.primary:hover {
+    background: rgba(88,166,255,0.18);
+  }
+  /* Live panel */
+  .live {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: none;
+    gap: 8px;
+    margin-bottom: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: #30363d transparent;
+    container-type: inline-size;
+    container-name: live;
+  }
+  .live.active {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-content: flex-start;
+  }
+  .live::-webkit-scrollbar { width: 5px; }
+  .live::-webkit-scrollbar-thumb {
+    background: #30363d;
+    border-radius: 3px;
+  }
+  /* По умолчанию (узкая вкладка Live) — карточки столбиком */
+  .live-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    flex: 1 1 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+  /* Только содержимое Live: от ширины панели Live */
+  @container live (min-width: 560px) {
+    .live-card {
+      flex: 1 1 240px;
+      max-width: calc(50% - 4px);
+    }
+  }
+  @container live (min-width: 860px) {
+    .live-card {
+      flex: 1 1 220px;
+      max-width: calc(33.333% - 6px);
+    }
+  }
+  @container live (min-width: 1160px) {
+    .live-card {
+      flex: 1 1 200px;
+      max-width: calc(25% - 6px);
+    }
+  }
+  .live-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .live-card-title {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--accent);
+  }
+  .live-card-eta {
+    font-size: 11px;
+    color: var(--orange);
+    font-weight: 500;
+  }
+  .live-boss {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .live-mission {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 8px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 6px;
+    margin-bottom: 4px;
+  }
+  .live-mission:last-child { margin-bottom: 0; }
+  .live-mission-type {
+    font-weight: 500;
+    font-size: 12px;
+  }
+  .live-mission-node {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .live-mission-mod {
+    font-size: 11px;
+    color: var(--orange);
+  }
+  .live-status {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    padding: 20px 10px;
+  }
+  .live-refresh {
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    padding: 4px 0;
+    flex-shrink: 0;
+  }
+  .live-refresh button {
+    background: none;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+    margin-left: 6px;
+  }
+  .live-refresh button:hover { text-decoration: underline; }
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    width: 280px;
+    padding: 16px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  }
+  .modal-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+  .field { margin-bottom: 12px; }
+  .field label {
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .field input {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .modal-actions .btn { padding: 8px 0; }
+  #file-input { display: none; }
+  .toast {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 12px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 200;
+  }
+  .toast.show { opacity: 1; }
+  .twitch-link {color: burlywood; font-size: smaller; text-decoration:none}
+
+  .app-nav{display:flex;gap:5px;margin:0 0 9px;flex-shrink:0}
+  .app-nav-btn,.btn{font:inherit;cursor:pointer}
+  .app-nav-btn{flex:1;padding:8px 5px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--muted);font-weight:600}
+  .app-nav-btn.active{background:rgba(88,166,255,.16);color:var(--accent);border-color:var(--accent)}
+  .app-page{display:none;flex:1;min-height:0;overflow:auto;padding:2px 2px 10px}
+  .app-page.active{display:block}
+  #tasks-page.active{display:flex;flex-direction:column}
+  .task-extra{font-size:10px;color:var(--muted);margin-top:2px;line-height:1.35}
+  .section-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px 0 10px}
+  .section-head .btn{width:auto;padding:6px 9px;white-space:nowrap}
+  .build-list{display:flex;flex-direction:column;gap:8px}
+  .build-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .build-card strong{display:block}.build-card small,.muted-small{color:var(--muted);font-size:10px}
+  .build-card-actions{display:flex;gap:5px}.build-card-actions button{padding:5px 7px}
+  .build-editor,.mod-library{padding-bottom:10px}
+  .field select,.field input[type=number],.field input[type=color]{width:100%;padding:8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:inherit}
+  .field input[type=color]{height:36px;padding:3px}
+  .stats-input-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .stats-input-grid .field{margin:0}.stats-input-grid input{padding:6px!important}
+  .build-stats{border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:10px;margin:10px 0}
+  .mod-slots{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .mod-slot{background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:7px;min-width:0}
+  .mod-slot label{display:block;color:var(--muted);font-size:10px;margin-bottom:4px}
+  .mod-slot select,.mod-slot input{width:100%;min-width:0;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:6px;font:inherit;font-size:11px;margin-bottom:5px}
+  .mod-slot .slot-meta{display:flex;gap:5px}.mod-slot .slot-meta>*{flex:1;width:50%}
+  .stat-result{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px}
+  .stat-result:last-child{border:0}.stat-positive{color:var(--green)}.stat-negative{color:var(--red)}
+  .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.settings-divider{border:0;border-top:1px solid var(--border);margin:14px 0}
+  #mod-library-list{margin-top:10px}.mod-library-row{padding:7px 0;border-bottom:1px solid var(--border);font-size:11px;display:flex;justify-content:space-between;gap:8px}
+  .app-page .btn{border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);padding:7px 10px}
+  .app-page .btn.primary{background:var(--accent);color:#07111d;border-color:var(--accent);font-weight:700}
+  #tasks-page .footer{flex-shrink:0}
+  /* Размер текста внутри карточек масштабируется вместе с настройкой шрифта. */
+  .task-name,.live-card-title,.build-card strong{font-size:var(--app-font-size,13px)!important}
+  .task-goal,.live-card-eta,.live-card .card-line,.build-card small{font-size:calc(var(--app-font-size,13px)*.85)!important}
+  .task-extra,.muted-small,.build-card .muted-small,.mod-library-row,.stat-result{font-size:calc(var(--app-font-size,13px)*.85)!important}
+  .mod-slot label{font-size:calc(var(--app-font-size,13px)*.77)!important}
+  .mod-slot select,.mod-slot input{font-size:calc(var(--app-font-size,13px)*.85)!important}
+  .live-card{font-size:var(--app-font-size,13px)}
+  .live-card *{font-size:inherit}
+  .live-card .live-card-title{font-size:var(--app-font-size,13px)!important}
+  .live-card .live-card-eta{font-size:calc(var(--app-font-size,13px)*.85)!important}
+  #tasks-page .tasks{min-height:0}
+  .task-extra span{display:inline-block;margin-right:8px}
+  @media(max-width:390px){.mod-slots{grid-template-columns:1fr}.settings-grid{grid-template-columns:1fr 1fr}}
+
+</style>
+</head>
+<body>
+  <div class="dock">
+    <div class="header">
+      <div class="logo">
+        <div class="logo-icon">W</div>
+        <span>Tracker v1.0.6<br>by Q7VYCH<br><a href="https://twitch.tv/q7vych" class="twitch-link" target="_blank">Twitch</a> · <a href="https://discord.com/invite/jErf968AAu" class="twitch-link" target="_blank">Discord</a></span>
+      </div>
+      <div class="tabs">
+        <div class="tab active" data-tab="daily">Ежедн.</div>
+        <div class="tab" data-tab="weekly">Еженед.</div>
+        <div class="tab" data-tab="live">Live Tracking</div>
+      </div>
+    </div>
+    <div class="app-nav" id="app-nav">
+      <button class="app-nav-btn active" data-page="tasks">Задания</button>
+      <button class="app-nav-btn" data-page="builds">Мои сборки</button>
+      <button class="app-nav-btn" data-page="settings">Настройки</button>
+    </div>
+    <div id="tasks-page" class="app-page active">
+    <div class="summary" id="summary">
+      <div class="summary-item">
+        <div class="summary-label">Ежедневные</div>
+        <div class="summary-value" id="daily-count">0/0</div>
+        <div class="summary-bar">
+          <div class="summary-fill daily" id="daily-bar" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-label">Еженедельные</div>
+        <div class="summary-value" id="weekly-count">0/0</div>
+        <div class="summary-bar">
+          <div class="summary-fill weekly" id="weekly-bar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+    <div class="tasks" id="task-list"></div>
+    <div class="live" id="live-panel">
+      <div class="live-status" id="live-status">Загрузка...</div>
+    </div>
+    <div class="live-refresh" id="live-refresh" style="display:none">
+      <span id="live-updated">—</span>
+      <button id="live-refresh-btn">Обновить</button>
+    </div>
+    <div class="footer" id="footer">
+      <div class="btn primary" id="add-btn">+ Добавить</div>
+      <div class="btn" id="export-btn">JSON ↓</div>
+      <div class="btn" id="import-btn">JSON ↑</div>
+      <div class="btn" id="reset-btn">Сброс</div>
+    </div>
+    </div><!-- /tasks-page -->
+    <section id="builds-page" class="app-page">
+      <div class="section-head"><strong>Мои сборки</strong><button class="btn primary" id="new-build">+ Создать сборку</button></div>
+      <div id="build-list" class="build-list"></div>
+      <div id="build-editor" class="build-editor" style="display:none">
+        <div class="section-head"><strong id="build-editor-title">Новая сборка</strong><button class="btn" id="close-build-editor">Назад</button></div>
+        <div class="field"><label>Название сборки</label><input id="build-name" maxlength="60" placeholder="Например: Экскалибур — Стальной путь"></div>
+        <div class="field"><label>Тип сборки</label><select id="build-type"><option value="warframe">Варфрейм</option><option value="primary">Основное оружие</option><option value="secondary">Вторичное оружие</option><option value="melee">Ближний бой</option><option value="archwing">Арчвинг</option><option value="archgun">Арч-пушка</option><option value="archmelee">Арч-ближний бой</option><option value="companion">Спутник</option><option value="sentinelweapon">Оружие стража</option></select></div>
+        <div class="field"><label>Предмет сборки</label><input id="build-item" list="build-item-options" maxlength="90" placeholder="Сначала выберите тип сборки"><datalist id="build-item-options"></datalist></div>
+        <div class="field"><label>Назначение сборки</label><input id="build-description" maxlength="180" placeholder="Например: выживаемость, стальной путь"></div>
+        <div class="build-stats">
+          <div class="section-head"><strong>Исходные характеристики</strong><span class="muted-small">до установки модификаций</span></div>
+          <div class="stats-input-grid" id="base-stats"></div>
+        </div>
+        <div class="section-head"><strong>Модификации — 8 ячеек</strong><button class="btn" id="manage-mods">Справочник модификаций</button></div>
+        <div id="mod-slots" class="mod-slots"></div>
+        <div class="build-stats"><strong>Характеристики после установки модов</strong><div id="calculated-stats"></div><div class="muted-small">Расчёт использует эффекты и ранги, указанные в базе модов. Расчёт не учитывает скрытые игровые механики и особые взаимодействия.</div></div>
+        <div class="modal-actions"><button class="btn" id="cancel-build">Отмена</button><button class="btn primary" id="save-build">Сохранить сборку</button></div>
+      </div>
+      <div id="mod-library" class="mod-library" style="display:none">
+        <div class="section-head"><strong>Справочник модификаций</strong><button class="btn" id="close-mod-library">Вернуться к сборке</button></div>
+        <div class="field"><label>Категория для фильтрации</label><select id="mod-category-filter"><option value="all">Все модификации</option><option value="standard">Обычные</option><option value="galvanized">Гальванизированные</option><option value="archon">Архонтовые</option><option value="syndicate">Синдикатские / аугменты</option><option value="weapon">Уникальные для оружия</option><option value="other">Другие специальные</option></select></div>
+        <div class="field"><label>Название модификации</label><input id="mod-name" maxlength="60" placeholder="Введите название"></div>
+        <div class="field"><label>Изменяемая характеристика</label><select id="mod-stat"><option value="strength">Сила способностей</option><option value="duration">Длительность</option><option value="range">Дальность</option><option value="efficiency">Эффективность</option><option value="health">Здоровье</option><option value="armor">Броня</option><option value="damage">Урон</option><option value="critChance">Крит. шанс</option><option value="critDamage">Крит. множитель</option><option value="status">Шанс статуса</option><option value="multishot">Мультивыстрел</option></select></div>
+        <div class="field"><label>Эффект на максимальном уровне (%)</label><input id="mod-value" type="number" step="0.1" value="30"></div>
+        <div class="field"><label>Максимальный уровень (0–10)</label><input id="mod-max-rank" type="number" min="0" max="10" value="5"></div>
+        <div class="field"><label>Полярность ячейки</label><select id="mod-polarity"><option value="—">Нет</option><option value="V">V — Мадарай</option><option value="—">— — Нарамон</option><option value="D">D — Вазари́н</option><option value="=">= — Зенурик</option><option value="Umbra">Умбра</option><option value="Aura">Аура</option><option value="Exilus">Эксилус</option></select></div>
+        <div class="field"><label>Совместимость</label><select id="mod-compatible"><option value="All">Все типы</option><option value="Warframe">Варфрейм</option><option value="Primary">Основное оружие</option><option value="Secondary">Вторичное оружие</option><option value="Melee">Ближний бой</option><option value="Archwing">Арчвинг</option><option value="Arch-Gun">Арч-пушка</option><option value="Arch-Melee">Арч-ближний бой</option><option value="Companion">Спутник</option><option value="Sentinel">Страж</option><option value="Necramech">Некрамех</option><option value="Parazon">Паразон</option></select></div>
+        <button class="btn primary" id="add-mod">Добавить модификацию</button><div id="mod-library-list"></div>
+      </div>
+    </section>
+    <section id="settings-page" class="app-page">
+      <strong>Внешний вид</strong>
+      <div class="settings-grid"><div class="field"><label>Ширина окна</label><input id="setting-width" type="number" min="360" max="1200" value="460"></div><div class="field"><label>Высота окна</label><input id="setting-height" type="number" min="500" max="1600" value="900"></div></div>
+      <div class="field"><label>Шрифт</label><select id="setting-font"><option>Inter</option><option>Arial</option><option>Roboto</option><option>Segoe UI</option><option>Tahoma</option></select></div>
+      <div class="field"><label>Размер шрифта: <span id="font-size-label">13</span> px</label><input id="setting-font-size" type="range" min="11" max="20" value="13"></div>
+      <div class="settings-grid"><div class="field"><label>Фон</label><input id="setting-bg" type="color" value="#0d1117"></div><div class="field"><label>Карточки</label><input id="setting-surface" type="color" value="#161b22"></div><div class="field"><label>Текст</label><input id="setting-text" type="color" value="#e6edf3"></div><div class="field"><label>Акцент</label><input id="setting-accent" type="color" value="#58a6ff"></div></div>
+      <div class="modal-actions"><button class="btn" id="reset-settings">По умолчанию</button><button class="btn primary" id="save-settings">Применить настройки</button></div>
+      <hr class="settings-divider"><strong>Источники игровых данных</strong><div class="muted-small">Задания: q7vych/w-tracker · игровые каталоги и русский словарь: WFCD/warframe-items.</div><button class="btn" id="github-check">Загрузить задания из GitHub</button><div id="github-status" class="muted-small">Источник заданий: q7vych/w-tracker/tasks.json. Загрузка выполняется только по нажатию кнопки.</div><hr class="settings-divider"><strong>Обновление приложения</strong><div class="muted-small">Проверяет файлы непосредственно в репозитории q7vych/w-tracker (ветка main) и скачивает только изменённые файлы интерфейса. Задания, сборки и настройки не перезаписываются.</div><button class="btn" id="file-update-check">Проверить обновления</button><div id="file-update-status" class="muted-small">Проверка запускается только по нажатию кнопки.</div>
+      <div class="muted-small">Задания, сборки и настройки сохраняются на этом компьютере. Игровые справочники загружаются из WFCD/warframe-items; задания — из q7vych/w-tracker. Локальные изменения не отправляются обратно в GitHub.</div>
+    </section>
+  </div>
+  <input type="file" id="file-input" accept=".json,application/json">
+  <div class="toast" id="toast"></div>
+  <div class="modal-overlay" id="modal">
+    <div class="modal">
+      <div class="modal-title" id="modal-title">Новая задача</div>
+      <div class="field">
+        <label>Название</label>
+        <input type="text" id="input-name" placeholder="Например: Фокус" maxlength="40" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Цель / описание</label>
+        <input type="text" id="input-goal" placeholder="Например: 355 000" maxlength="30" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Место фарма</label>
+        <input type="text" id="input-place" placeholder="Например: Сатурн — Габии" maxlength="80" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Количество</label>
+        <input type="text" id="input-quantity" placeholder="Например: 0 / 10 или 5 шт." maxlength="40" autocomplete="off">
+      </div>
+      <div class="modal-actions">
+        <div class="btn" id="modal-cancel">Отмена</div>
+        <div class="btn primary" id="modal-save">Сохранить</div>
+      </div>
+    </div>
+  </div>
+<script>
+const STORAGE_KEY = "wf_tracker_v5";
+const API_BASE = "https://api.warframestat.us";
+const API_PLATFORM = "pc";
+const API_LANG = "ru";
+const DEFAULT_DAILY = [
+  { id: "d1",  name: "Фокус",           goal: "355 000" },
+  { id: "d2",  name: "Вылазка",         goal: "3 миссии" },
+  { id: "d3",  name: "Острон",          goal: "репутация" },
+  { id: "d4",  name: "Перья",           goal: "репутация" },
+  { id: "d5",  name: "Глас Солярис",    goal: "репутация" },
+  { id: "d6",  name: "Энтрати",         goal: "репутация" },
+  { id: "d7",  name: "Неукротимые",     goal: "репутация" },
+  { id: "d8",  name: "Кавия",           goal: "репутация" },
+  { id: "d9",  name: "Гекс 1999",       goal: "календарь" },
+  { id: "d10", name: "Кувы",            goal: "фарм" },
+];
+const DEFAULT_WEEKLY = [
+  { id: "w1", name: "Цепи SP",          goal: "10 уровней" },
+  { id: "w2", name: "Спуск Normal",     goal: "награды" },
+  { id: "w3", name: "Спуск SP",         goal: "награды" },
+  { id: "w4", name: "Ячейки Нетры",     goal: "5 забегов" },
+  { id: "w5", name: "Птичка",           goal: "осколок" },
+  { id: "w6", name: "Охота на Архонта", goal: "осколок" },
+  { id: "w7", name: "Archimedea",       goal: "по желанию" },
+  { id: "w8", name: "Рейд",             goal: "1 раз" },
+  { id: "w9", name: "Кувы (макс)",      goal: "фарм" },
+];
+let currentTab = "daily";
+let editId = null;
+let fileHandle = null;
+let liveTimer = null;
+
+function getDefaults() {
+  return {
+    daily: DEFAULT_DAILY.map(function(t) { return { id: t.id, name: t.name, goal: t.goal }; }),
+    weekly: DEFAULT_WEEKLY.map(function(t) { return { id: t.id, name: t.name, goal: t.goal }; }),
+    done: {},
+    periods: {
+      daily: "",
+      weekly: ""
+    }
+  };
+}
+function getLocalDateKey(date) {
+  var d = date || new Date();
+  return d.getFullYear() + "-" +
+    String(d.getMonth() + 1).padStart(2, "0") + "-" +
+    String(d.getDate()).padStart(2, "0");
+}
+function getWeekKey(date) {
+  var d = new Date(date || new Date());
+  var day = d.getDay();
+  var diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return getLocalDateKey(d);
+}
+function normalizeTask(task, fallbackId) {
+  if (!task || typeof task !== "object") return null;
+  var id = typeof task.id === "string" && task.id.trim() ? task.id.trim() : fallbackId;
+  var name = typeof task.name === "string" ? task.name.trim() : "";
+  var goal = typeof task.goal === "string" ? task.goal.trim() : "";
+  if (!name) return null;
+  return { id: id, name: name, goal: goal || "—", place: String(task.place || ""), quantity: String(task.quantity || "") };
+}
+function uniqueTaskIds(tasks) {
+  var used = {};
+  return tasks.map(function(t, i) {
+    var base = t.id || ("c" + Date.now().toString(36) + i);
+    var id = base;
+    var n = 2;
+    while (used[id]) id = base + "-" + n++;
+    used[id] = true;
+    return { id: id, name: t.name, goal: t.goal, place: t.place || "", quantity: t.quantity || "" };
+  });
+}
+function normalizeData(input) {
+  var defaults = getDefaults();
+  var data = input && typeof input === "object" ? input : {};
+  var daily = Array.isArray(data.daily)
+    ? data.daily.map(function(t, i) { return normalizeTask(t, "d" + (i + 1)); }).filter(Boolean)
+    : defaults.daily;
+  var weekly = Array.isArray(data.weekly)
+    ? data.weekly.map(function(t, i) { return normalizeTask(t, "w" + (i + 1)); }).filter(Boolean)
+    : defaults.weekly;
+
+  if (!daily.length) daily = defaults.daily;
+  if (!weekly.length) weekly = defaults.weekly;
+
+  daily = uniqueTaskIds(daily);
+  weekly = uniqueTaskIds(weekly);
+
+  var done = {};
+  if (data.done && typeof data.done === "object" && !Array.isArray(data.done)) {
+    Object.keys(data.done).forEach(function(id) {
+      if (data.done[id]) done[id] = true;
+    });
+  }
+
+  var periods = data.periods && typeof data.periods === "object" ? data.periods : {};
+  return {
+    daily: daily,
+    weekly: weekly,
+    done: done,
+    periods: {
+      daily: typeof periods.daily === "string" ? periods.daily : "",
+      weekly: typeof periods.weekly === "string" ? periods.weekly : ""
+    }
+  };
+}
+function resetExpiredPeriods(data) {
+  var dailyKey = getLocalDateKey();
+  var weeklyKey = getWeekKey();
+  if (data.periods.daily !== dailyKey) {
+    data.daily.forEach(function(t) { delete data.done[t.id]; });
+    data.periods.daily = dailyKey;
+  }
+  if (data.periods.weekly !== weeklyKey) {
+    data.weekly.forEach(function(t) { delete data.done[t.id]; });
+    data.periods.weekly = weeklyKey;
+  }
+  return data;
+}
+function loadData() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      var data = normalizeData(JSON.parse(raw));
+      resetExpiredPeriods(data);
+      saveData(data);
+      return data;
+    }
+  } catch (e) {}
+  var defaults = getDefaults();
+  resetExpiredPeriods(defaults);
+  return defaults;
+}
+function saveData(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+function getTasks(data) {
+  return currentTab === "daily" ? data.daily : data.weekly;
+}
+function uid() {
+  return "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+function esc(str) {
+  var d = document.createElement("div");
+  d.textContent = str || "";
+  return d.innerHTML;
+}
+function showToast(msg) {
+  var t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(function() { t.classList.remove("show"); }, 1800);
+}
+function updateSummary(data) {
+  var dDone = data.daily.filter(function(t) { return data.done[t.id]; }).length;
+  var wDone = data.weekly.filter(function(t) { return data.done[t.id]; }).length;
+  document.getElementById("daily-count").textContent = dDone + "/" + data.daily.length;
+  document.getElementById("daily-bar").style.width = (data.daily.length ? (dDone / data.daily.length * 100) : 0) + "%";
+  document.getElementById("weekly-count").textContent = wDone + "/" + data.weekly.length;
+  document.getElementById("weekly-bar").style.width = (data.weekly.length ? (wDone / data.weekly.length * 100) : 0) + "%";
+}
+function render() {
+  var data = loadData();
+  var tasks = getTasks(data).slice();
+  tasks.sort(function(a, b) {
+    var aDone = data.done[a.id] ? 1 : 0;
+    var bDone = data.done[b.id] ? 1 : 0;
+    return aDone - bDone;
+  });
+  var list = document.getElementById("task-list");
+  list.innerHTML = "";
+  tasks.forEach(function(task) {
+    var done = !!data.done[task.id];
+    var el = document.createElement("div");
+    el.className = "task" + (done ? " done" : "");
+    el.innerHTML =
+      '<div class="checkbox">' + (done ? "✓" : "") + '</div>' +
+      '<div class="task-info">' +
+        '<div class="task-name">' + esc(task.name) + '</div>' +
+        '<div class="task-goal">' + esc(task.goal) + '</div>' +
+        ((task.place || task.quantity) ? '<div class="task-extra">' + (task.place ? '<span>⌖ ' + esc(task.place) + '</span>' : '') + (task.quantity ? '<span>▣ ' + esc(task.quantity) + '</span>' : '') + '</div>' : '') +
+      '</div>' +
+      '<div class="task-actions">' +
+        '<button class="action-btn edit" title="Редактировать">✎</button>' +
+        '<button class="action-btn delete" title="Удалить">✕</button>' +
+      '</div>';
+    function toggle(e) {
+      e.stopPropagation();
+      var d = loadData();
+      d.done[task.id] = !d.done[task.id];
+      saveData(d);
+      render();
+    }
+    el.querySelector(".checkbox").addEventListener("click", toggle);
+    el.querySelector(".task-info").addEventListener("click", toggle);
+    el.querySelector(".edit").addEventListener("click", function(e) {
+      e.stopPropagation();
+      openModal(task);
+    });
+    el.querySelector(".delete").addEventListener("click", function(e) {
+      e.stopPropagation();
+      if (!confirm("Удалить «" + task.name + "»?")) return;
+      var d = loadData();
+      var arr = currentTab === "daily" ? d.daily : d.weekly;
+      var idx = arr.findIndex(function(t) { return t.id === task.id; });
+      if (idx !== -1) arr.splice(idx, 1);
+      delete d.done[task.id];
+      saveData(d);
+      render();
+    });
+    list.appendChild(el);
+  });
+  updateSummary(data);
+}
+function openModal(task) {
+  editId = task ? task.id : null;
+  document.getElementById("modal-title").textContent = task ? "Редактировать" : "Новая задача";
+  document.getElementById("input-name").value = task ? task.name : "";
+  document.getElementById("input-goal").value = task ? task.goal : "";
+  document.getElementById("input-place").value = task ? (task.place || "") : "";
+  document.getElementById("input-quantity").value = task ? (task.quantity || "") : "";
+  document.getElementById("modal").classList.add("show");
+  setTimeout(function() {
+    document.getElementById("input-name").focus();
+  }, 50);
+}
+function closeModal() {
+  document.getElementById("modal").classList.remove("show");
+  editId = null;
+}
+
+/* ===== LIVE API ===== */
+function formatEta(eta) {
+  if (!eta) return "—";
+  var s = String(eta).trim();
+  if (!s) return "—";
+  s = s.replace(/\\s*ago$/i, "").trim();
+  s = s.replace(/(\\d+)d/g, "$1д");
+  s = s.replace(/(\\d+)h/g, "$1ч");
+  s = s.replace(/(\\d+)m/g, "$1м");
+  s = s.replace(/(\\d+)s/g, "").replace(/\\s{2,}/g, " ").trim();
+  return s || "—";
+}
+
+function etaFromExpiry(expiry) {
+  if (!expiry) return "";
+  var ms = new Date(expiry).getTime() - Date.now();
+  if (isNaN(ms) || ms <= 0) return "истекло";
+  var d = Math.floor(ms / 86400000);
+  var h = Math.floor((ms % 86400000) / 3600000);
+  var m = Math.floor((ms % 3600000) / 60000);
+  if (d > 0) return d + "д " + h + "ч";
+  if (h > 0) return h + "ч " + m + "м";
+  return m + "м";
+}
+
+function cardSortie(data) {
+  if (!data || data.expired) return "";
+  var missions = (data.variants || []).map(function(v, i) {
+    return '<div class="live-mission">' +
+      '<div class="live-mission-type">' + (i + 1) + '. ' + esc(v.missionType || v.missionTypeKey || "—") + '</div>' +
+      '<div class="live-mission-node">' + esc(v.node || "—") + '</div>' +
+      (v.modifier ? '<div class="live-mission-mod">' + esc(v.modifier) + '</div>' : '') +
+    '</div>';
+  }).join("");
+  return '<div class="live-card">' +
+    '<div class="live-card-header">' +
+      '<div class="live-card-title">Вылазка</div>' +
+      '<div class="live-card-eta">' + esc(formatEta(data.eta) || etaFromExpiry(data.expiry)) + '</div>' +
+    '</div>' +
+    '<div class="live-boss">' + esc(data.boss || "") + (data.faction ? " · " + esc(data.faction) : "") + '</div>' +
+    missions +
+  '</div>';
+}
+
+function cardArchon(data) {
+  if (!data || data.expired) return "";
+  var missions = (data.missions || []).map(function(m, i) {
+    return '<div class="live-mission">' +
+      '<div class="live-mission-type">' + (i + 1) + '. ' + esc(m.type || m.typeKey || "—") + '</div>' +
+      '<div class="live-mission-node">' + esc(m.node || "—") + '</div>' +
+    '</div>';
+  }).join("");
+  return '<div class="live-card">' +
+    '<div class="live-card-header">' +
+      '<div class="live-card-title">Охота на Архонта</div>' +
+      '<div class="live-card-eta">' + esc(formatEta(data.eta) || etaFromExpiry(data.expiry)) + '</div>' +
+    '</div>' +
+    '<div class="live-boss">' + esc(data.boss || "") + (data.faction ? " · " + esc(data.faction) : "") + '</div>' +
+    missions +
+  '</div>';
+}
+
+function isValidArbitration(data) {
+  if (!data || data.expired) return false;
+  var node = data.node || data.nodeKey || "";
+  var type = data.type || data.typeKey || "";
+  if (!node || node === "SolNode000") return false;
+  if (type === "Unknown" || type === "") return false;
+  return true;
+}
+
+function cardArbitration(data) {
+  if (!isValidArbitration(data)) return "";
+  return '<div class="live-card">' +
+    '<div class="live-card-header">' +
+      '<div class="live-card-title">Арбитраж</div>' +
+      '<div class="live-card-eta">' + esc(formatEta(data.eta) || etaFromExpiry(data.expiry)) + '</div>' +
+    '</div>' +
+    '<div class="live-mission">' +
+      '<div class="live-mission-type">' + esc(data.type || data.missionType || "—") + '</div>' +
+      '<div class="live-mission-node">' + esc(data.node || "—") +
+        (data.enemy && data.enemy !== "Tenno" ? " · " + esc(data.enemy) : "") +
+        (data.archwing ? " · Archwing" : "") +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function formatAlertReward(mission) {
+  if (!mission || !mission.reward) return "";
+  var r = mission.reward;
+  var parts = [];
+  if (r.credits) parts.push(r.credits.toLocaleString("ru-RU") + " кр.");
+  if (r.countedItems && r.countedItems.length) {
+    r.countedItems.forEach(function(it) {
+      parts.push((it.count ? it.count + "× " : "") + (it.type || it.key || "предмет"));
+    });
+  }
+  if (r.items && r.items.length) {
+    r.items.forEach(function(it) {
+      parts.push(typeof it === "string" ? it : (it.name || it.type || "предмет"));
+    });
+  }
+  return parts.join(", ");
+}
+
+function cardAlerts(list) {
+  if (!list || !list.length) return "";
+  var missions = list.slice(0, 8).map(function(a) {
+    var m = a.mission || {};
+    var reward = formatAlertReward(m);
+    return '<div class="live-mission">' +
+      '<div class="live-mission-type">' + esc(m.type || m.typeKey || "Миссия") +
+        ' <span style="color:var(--orange);font-weight:500">· ' + esc(etaFromExpiry(a.expiry)) + '</span>' +
+      '</div>' +
+      '<div class="live-mission-node">' + esc(m.node || "—") +
+        (m.faction ? " · " + esc(m.faction) : "") +
+      '</div>' +
+      (reward ? '<div class="live-mission-mod">' + esc(reward) + '</div>' : '') +
+    '</div>';
+  }).join("");
+  return '<div class="live-card">' +
+    '<div class="live-card-header">' +
+      '<div class="live-card-title">Сигналы тревоги</div>' +
+      '<div class="live-card-eta">' + list.length + '</div>' +
+    '</div>' +
+    missions +
+  '</div>';
+}
+
+function cardInvasions(list) {
+  if (!list || !list.length) return "";
+  var active = list.filter(function(inv) { return !inv.completed; }).slice(0, 6);
+  if (!active.length) return "";
+  var rows = active.map(function(inv) {
+    var atk = (inv.attackerReward && inv.attackerReward.itemString) || (inv.attacker && inv.attacker.faction) || "—";
+    var def = (inv.defenderReward && inv.defenderReward.itemString) || (inv.defender && inv.defender.faction) || "—";
+    var pct = typeof inv.completion === "number" ? Math.round(inv.completion) + "%" : "";
+    return '<div class="live-mission">' +
+      '<div class="live-mission-type">' + esc(inv.node || "—") + (pct ? ' · ' + pct : '') + '</div>' +
+      '<div class="live-mission-node">' + esc(inv.desc || inv.attacker && inv.attacker.factionKey || "") + '</div>' +
+      '<div class="live-mission-mod">⚔ ' + esc(atk) + '  /  🛡 ' + esc(def) + '</div>' +
+    '</div>';
+  }).join("");
+  return '<div class="live-card">' +
+    '<div class="live-card-header">' +
+      '<div class="live-card-title">Вторжения</div>' +
+      '<div class="live-card-eta">' + active.length + '</div>' +
+    '</div>' +
+    rows +
+  '</div>';
+}
+
+function cardFissures(list) {
+  if (!list || !list.length) return "";
+  var sp = list.filter(function(f) { return f.isHard; });
+  var normal = list.filter(function(f) { return !f.isHard; });
+  // приоритет: SP, потом обычные; по тиру
+  function tierOrder(t) {
+    var m = { Lith: 1, Meso: 2, Neo: 3, Axi: 4, Requiem: 5, Omni: 6 };
+    return m[t] || 9;
+  }
+  sp.sort(function(a, b) { return tierOrder(a.tier) - tierOrder(b.tier); });
+  normal.sort(function(a, b) { return tierOrder(a.tier) - tierOrder(b.tier); });
+  var show = sp.concat(normal).slice(0, 12);
+  var rows = show.map(function(f) {
+    var tag = f.isHard ? "SP " : "";
+    return '<div class="live-mission">' +
+      '<div class="live-mission-type">' + tag + esc(f.tier || "") + " · " + esc(f.missionType || f.missionKey || "—") +
+        ' <span style="color:var(--orange);font-weight:500">· ' + esc(formatEta(f.eta) || etaFromExpiry(f.expiry)) + '</span>' +
+      '</div>' +
+      '<div class="live-mission-node">' + esc(f.node || "—") + (f.enemy ? " · " + esc(f.enemy) : "") + '</div>' +
+    '</div>';
+  }).join("");
+  return '<div class="live-card">' +
+    '<div class="live-card-header">' +
+      '<div class="live-card-title">Разрывы</div>' +
+      '<div class="live-card-eta">SP ' + sp.length + ' / ' + list.length + '</div>' +
+    '</div>' +
+    rows +
+  '</div>';
+}
+
+function cardBaro(data) {
+  if (!data) return "";
+  var active = data.active;
+  var eta = active ? (formatEta(data.endString) || etaFromExpiry(data.expiry)) : (formatEta(data.startString) || etaFromExpiry(data.activation));
+  var loc = data.location || "—";
+  var inv = (data.inventory || []).slice(0, 10);
+  var items = inv.map(function(it) {
+    var price = [];
+    if (it.ducats) price.push(it.ducats + " дук.");
+    if (it.credits) price.push(Number(it.credits).toLocaleString("ru-RU") + " кр.");
+    return '<div class="live-mission">' +
+      '<div class="live-mission-type">' + esc(it.item || it.id || "—") + '</div>' +
+      (price.length ? '<div class="live-mission-mod">' + esc(price.join(" / ")) + '</div>' : '') +
+    '</div>';
+  }).join("");
+  return '<div class="live-card">' +
+    '<div class="live-card-header">' +
+      '<div class="live-card-title">Баро КиТиир</div>' +
+      '<div class="live-card-eta">' + (active ? "уходит " : "через ") + esc(eta) + '</div>' +
+    '</div>' +
+    '<div class="live-boss">' + (active ? "Сейчас: " : "Прибудет: ") + esc(loc) + '</div>' +
+    (active && items ? items : (active ? "" : '<div class="live-mission-node">Ассортимент появится по прибытии</div>')) +
+  '</div>';
+}
+
+function cardCycles(cetus, vallis, cambion) {
+  function row(name, data, dayLabel, nightLabel) {
+    if (!data) return "";
+    var state = "";
+    if (typeof data.isDay === "boolean") state = data.isDay ? dayLabel : nightLabel;
+    else if (data.state) state = data.state;
+    else if (data.active) state = data.active;
+    var eta = formatEta(data.timeLeft) || formatEta(data.shortString) || etaFromExpiry(data.expiry);
+    return '<div class="live-mission">' +
+      '<div class="live-mission-type">' + esc(name) + " · " + esc(state || "—") + '</div>' +
+      '<div class="live-mission-node">до смены: ' + esc(eta || "—") + '</div>' +
+    '</div>';
+  }
+  var body = row("Цетус", cetus, "День", "Ночь") +
+             row("Долины", vallis, "Тепло", "Холод") +
+             row("Камбион", cambion, "Фэз", "Воум");
+  if (!body) return "";
+  return '<div class="live-card">' +
+    '<div class="live-card-header">' +
+      '<div class="live-card-title">Циклы</div>' +
+      '<div class="live-card-eta">live</div>' +
+    '</div>' +
+    body +
+  '</div>';
+}
+
+function cardSteelPath(data) {
+  if (!data) return "";
+  var reward = data.currentReward ? (data.currentReward.name + (data.currentReward.cost ? " · " + data.currentReward.cost + " med." : "")) : "—";
+  var left = formatEta(data.remaining) || etaFromExpiry(data.expiry);
+  var inc = data.incursions;
+  var incHtml = "";
+  if (inc) {
+    incHtml = '<div class="live-mission">' +
+      '<div class="live-mission-type">Инкурсии</div>' +
+      '<div class="live-mission-node">до сброса: ' + esc(formatEta(inc.eta) || etaFromExpiry(inc.expiry)) + '</div>' +
+    '</div>';
+  }
+  return '<div class="live-card">' +
+    '<div class="live-card-header">' +
+      '<div class="live-card-title">Steel Path</div>' +
+      '<div class="live-card-eta">' + esc(left) + '</div>' +
+    '</div>' +
+    '<div class="live-boss">Награда недели: ' + esc(reward) + '</div>' +
+    incHtml +
+  '</div>';
+}
+
+function cardNightwave(data) {
+  if (!data || !data.active) return "";
+  var season = data.season != null ? "S" + data.season : "";
+  var challenges = (data.activeChallenges || []).filter(function(c) { return !c.isDaily; }).slice(0, 8);
+  var dailies = (data.activeChallenges || []).filter(function(c) { return c.isDaily; }).slice(0, 4);
+  function rows(list) {
+    return list.map(function(c) {
+      return '<div class="live-mission">' +
+        '<div class="live-mission-type">' + esc(c.title || c.desc || "Задание") +
+          (c.reputation ? ' · ' + c.reputation + ' реп.' : '') +
+        '</div>' +
+        (c.desc && c.title ? '<div class="live-mission-node">' + esc(c.desc) + '</div>' : '') +
+      '</div>';
+    }).join("");
+  }
+  var body = "";
+  if (dailies.length) body += '<div class="live-boss">Ежедневные</div>' + rows(dailies);
+  if (challenges.length) body += '<div class="live-boss" style="margin-top:6px">Еженедельные</div>' + rows(challenges);
+  if (!body) body = '<div class="live-mission-node">Нет активных заданий</div>';
+  return '<div class="live-card">' +
+    '<div class="live-card-header">' +
+      '<div class="live-card-title">Ночная волна ' + esc(season) + '</div>' +
+      '<div class="live-card-eta">' + esc(formatEta(data.eta) || etaFromExpiry(data.expiry)) + '</div>' +
+    '</div>' +
+    body +
+  '</div>';
+}
+
+async function fetchLive() {
+  var panel = document.getElementById("live-panel");
+  var status = document.getElementById("live-status");
+  if (status) status.textContent = "Загрузка...";
+
+  try {
+    var requestErrors = [];
+    function get(path) {
+      // Сначала используем языковой маршрут API (/ru/{field}).
+      // Если он недоступен, пробуем платформенный endpoint с language=ru.
+      var localizedUrl = API_BASE + "/" + API_LANG + path;
+      var platformUrl = API_BASE + "/" + API_PLATFORM + path + "?language=" + encodeURIComponent(API_LANG);
+
+      function request(url) {
+        return fetch(url, { headers: { "Accept": "application/json", "Accept-Language": API_LANG } })
+          .then(function(r) {
+            if (!r.ok) throw new Error(url + " — HTTP " + r.status);
+            return r.json();
+          });
+      }
+
+      return request(localizedUrl).catch(function(firstError) {
+        console.warn("WarframeStatus localized endpoint failed:", localizedUrl, firstError);
+        return request(platformUrl);
+      }).catch(function(err) {
+        requestErrors.push(path + ": " + (err.message || err));
+        console.error("WarframeStatus API:", path, err);
+        return null;
+      });
+    }
+
+    var results = await Promise.all([
+      get("/sortie"),
+      get("/archonHunt"),
+      get("/arbitration"),
+      get("/alerts"),
+      get("/invasions"),
+      get("/fissures"),
+      get("/voidTrader"),
+      get("/cetusCycle"),
+      get("/vallisCycle"),
+      get("/cambionCycle"),
+      get("/steelPath"),
+      get("/nightwave")
+    ]);
+
+    var html =
+      cardSortie(results[0]) +
+      cardArchon(results[1]) +
+      cardArbitration(results[2]) +
+      cardAlerts(results[3]) +
+      cardInvasions(results[4]) +
+      cardFissures(results[5]) +
+      cardBaro(results[6]) +
+      cardCycles(results[7], results[8], results[9]) +
+      cardSteelPath(results[10]) +
+      cardNightwave(results[11]);
+
+    if (!html) html = '<div class="live-status">Нет активных данных</div>';
+    if (requestErrors.length) {
+      html += '<div class="live-status" style="margin-top:8px">Не удалось загрузить: ' +
+        esc(requestErrors.join(" · ")) + '</div>';
+    }
+    panel.innerHTML = html;
+
+    var now = new Date();
+    var timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    document.getElementById("live-updated").textContent = "Обновлено: " + timeStr + " · PC · RU";
+    document.getElementById("live-refresh").style.display = "block";
+  } catch (e) {
+    panel.innerHTML = '<div class="live-status">Ошибка загрузки API<br><span style="font-size:11px;opacity:0.7">' + esc(String(e.message || e)) + '</span></div>';
+    document.getElementById("live-refresh").style.display = "block";
+  }
+}
+
+function startLivePolling() {
+  fetchLive();
+  if (liveTimer) clearInterval(liveTimer);
+  liveTimer = setInterval(fetchLive, 60000);
+}
+
+function stopLivePolling() {
+  if (liveTimer) {
+    clearInterval(liveTimer);
+    liveTimer = null;
+  }
+}
+
+/* ===== Tabs ===== */
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll(".tab").forEach(function(t) {
+    t.classList.toggle("active", t.dataset.tab === tab);
+  });
+
+  var isLive = tab === "live";
+  document.getElementById("summary").classList.toggle("hidden", isLive);
+  document.getElementById("task-list").classList.toggle("hidden", isLive);
+  document.getElementById("footer").classList.toggle("hidden", isLive);
+  document.getElementById("live-panel").classList.toggle("active", isLive);
+  document.getElementById("live-refresh").style.display = isLive ? "block" : "none";
+
+  if (isLive) {
+    startLivePolling();
+  } else {
+    stopLivePolling();
+    render();
+  }
+}
+
+/* ===== JSON ===== */
+async function writeToHandle(handle, data) {
+  var writable = await handle.createWritable();
+  await writable.write(JSON.stringify(data, null, 2));
+  await writable.close();
+}
+async function exportJSON() {
+  var data = loadData();
+  var text = JSON.stringify(data, null, 2);
+  if (fileHandle) {
+    try {
+      await writeToHandle(fileHandle, data);
+      showToast("Сохранено в JSON");
+      return;
+    } catch (e) { fileHandle = null; }
+  }
+  if (window.showSaveFilePicker) {
+    try {
+      fileHandle = await window.showSaveFilePicker({
+        suggestedName: "tasks.json",
+        types: [{ description: "JSON", accept: { "application/json": [".json"] } }]
+      });
+      await writeToHandle(fileHandle, data);
+      showToast("Сохранено в JSON");
+      return;
+    } catch (e) {
+      if (e && e.name === "AbortError") return;
+    }
+  }
+  try {
+    var blob = new Blob([text], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "tasks.json";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 200);
+    showToast("JSON скачан");
+  } catch (e) {
+    showToast("Не удалось сохранить JSON");
+  }
+}
+async function importJSONFromPicker() {
+  if (window.showOpenFilePicker) {
+    try {
+      var handles = await window.showOpenFilePicker({
+        types: [{ description: "JSON", accept: { "application/json": [".json"] } }],
+        multiple: false
+      });
+      fileHandle = handles[0];
+      var file = await fileHandle.getFile();
+      var text = await file.text();
+      applyImportedJSON(text);
+      return;
+    } catch (e) {
+      if (e && e.name === "AbortError") return;
+    }
+  }
+  document.getElementById("file-input").click();
+}
+function applyImportedJSON(text) {
+  try {
+    var parsed = JSON.parse(text);
+    var data = normalizeData(parsed);
+    resetExpiredPeriods(data);
+    saveData(data);
+    render();
+    showToast("JSON загружен");
+  } catch (err) {
+    alert("Ошибка чтения JSON: " + err.message);
+  }
+}
+function importJSON(file) {
+  var reader = new FileReader();
+  reader.onload = function(e) { applyImportedJSON(e.target.result); };
+  reader.readAsText(file);
+}
+
+/* ===== Events ===== */
+document.getElementById("modal-cancel").addEventListener("click", closeModal);
+document.getElementById("modal-save").addEventListener("click", function() {
+  var name = document.getElementById("input-name").value.trim();
+  var goal = document.getElementById("input-goal").value.trim();
+  if (!name) {
+    document.getElementById("input-name").focus();
+    return;
+  }
+  var data = loadData();
+  var arr = currentTab === "daily" ? data.daily : data.weekly;
+  if (editId) {
+    var task = arr.find(function(t) { return t.id === editId; });
+    if (task) {
+      task.name = name;
+      task.goal = goal || "—";
+      task.place = document.getElementById("input-place").value.trim();
+      task.quantity = document.getElementById("input-quantity").value.trim();
+    }
+  } else {
+    arr.push({ id: uid(), name: name, goal: goal || "—", place: document.getElementById("input-place").value.trim(), quantity: document.getElementById("input-quantity").value.trim() });
+  }
+  saveData(data);
+  closeModal();
+  render();
+});
+document.getElementById("input-name").addEventListener("keydown", function(e) {
+  if (e.key === "Enter") document.getElementById("modal-save").click();
+});
+document.getElementById("input-goal").addEventListener("keydown", function(e) {
+  if (e.key === "Enter") document.getElementById("modal-save").click();
+});
+document.querySelectorAll(".tab").forEach(function(tab) {
+  tab.addEventListener("click", function() {
+    switchTab(tab.dataset.tab);
+  });
+});
+document.getElementById("add-btn").addEventListener("click", function() { openModal(null); });
+document.getElementById("export-btn").addEventListener("click", function() { exportJSON(); });
+document.getElementById("import-btn").addEventListener("click", function() { importJSONFromPicker(); });
+document.getElementById("file-input").addEventListener("change", function(e) {
+  var file = e.target.files[0];
+  if (file) importJSON(file);
+  e.target.value = "";
+});
+document.getElementById("reset-btn").addEventListener("click", function() {
+  if (!confirm("Сбросить все галочки в этом разделе?")) return;
+  var data = loadData();
+  getTasks(data).forEach(function(t) { delete data.done[t.id]; });
+  saveData(data);
+  render();
+});
+document.getElementById("live-refresh-btn").addEventListener("click", function() {
+  fetchLive();
+});
+
+render();
+</script>
+
+<script>
+(function(){
+'use strict';
+const K={builds:'wf_tracker_builds_v1',mods:'wf_tracker_mods_v1',settings:'wf_tracker_settings_v1',github:'wf_tracker_github_v1'};
+const $=id=>document.getElementById(id);
+const read=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}};
+const write=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+const CATALOG_KEY='wf_tracker_wfcd_catalog_v2';
+let savedCatalog=read(CATALOG_KEY,{mods:[],warframes:[],weapons:[],archwings:[],companions:[],sentinelWeapons:[],updatedAt:null});
+let builds=read(K.builds,[]), mods=read(K.mods,[
+ {id:'intensify',name:'Intensify',stat:'strength',value:30,maxRank:5,polarity:'V'},
+ {id:'continuity',name:'Continuity',stat:'duration',value:30,maxRank:5,polarity:'—'},
+ {id:'stretch',name:'Stretch',stat:'range',value:45,maxRank:5,polarity:'—'},
+ {id:'streamline',name:'Streamline',stat:'efficiency',value:30,maxRank:5,polarity:'—'},
+ {id:'vitality',name:'Vitality',stat:'health',value:100,maxRank:10,polarity:'D'},
+ {id:'steel-fiber',name:'Steel Fiber',stat:'armor',value:110,maxRank:10,polarity:'D'},
+ {id:'serration',name:'Serration',stat:'damage',value:165,maxRank:10,polarity:'V'},
+ {id:'point-strike',name:'Point Strike',stat:'critChance',value:150,maxRank:5,polarity:'V'},
+ {id:'vital-sense',name:'Vital Sense',stat:'critDamage',value:120,maxRank:5,polarity:'V'},
+ {id:'status',name:'Rifle Aptitude',stat:'status',value:90,maxRank:5,polarity:'—'},
+ {id:'galv-chamber',name:'Galvanized Chamber',displayName:'Гальванизированный патронник',category:'galvanized',stat:'multishot',value:80,maxRank:10,polarity:'V',special:'При убийстве: +30% к мультивыстрелу на 20 сек., до 2 накоплений.'},
+ {id:'galv-aptitude',name:'Galvanized Aptitude',displayName:'Гальванизированная меткость',category:'galvanized',stat:'status',value:80,maxRank:10,polarity:'V',special:'Дополнительный урон за каждый тип эффекта статуса на цели; зависит от оружия.'},
+ {id:'galv-scope',name:'Galvanized Scope',displayName:'Гальванизированный прицел',category:'galvanized',stat:'critChance',value:120,maxRank:10,polarity:'V',special:'При попадании в голову: временный бонус к критическому шансу; убийство выстрелом в голову усиливает эффект.'},
+ {id:'galv-savy',name:'Galvanized Savvy',displayName:'Гальванизированная смекалка',category:'galvanized',stat:'status',value:80,maxRank:10,polarity:'V',special:'Дополнительный урон за каждый тип эффекта статуса на цели; зависит от оружия.'},
+ {id:'galv-acceleration',name:'Galvanized Acceleration',displayName:'Гальванизированное ускорение',category:'galvanized',stat:'damage',value:0,maxRank:10,polarity:'V',special:'Увеличивает скорость полёта снарядов; не выражается одним процентом урона.'},
+ {id:'galv-diffusion',name:'Galvanized Diffusion',displayName:'Гальванизированная диффузия',category:'galvanized',stat:'multishot',value:110,maxRank:10,polarity:'V',special:'При убийстве: временный бонус к мультивыстрелу, складывается до 4 раз.'},
+ {id:'archon-intensify',name:'Archon Intensify',displayName:'Архонтовое усиление',category:'archon',stat:'strength',value:30,maxRank:5,polarity:'V',special:'Дополнительно +30% к силе способностей после восстановления здоровья союзника способностью.'},
+ {id:'archon-continuity',name:'Archon Continuity',displayName:'Архонтовая непрерывность',category:'archon',stat:'duration',value:55,maxRank:5,polarity:'V',special:'Способности с токсическим уроном накладывают дополнительный эффект токсина.'},
+ {id:'archon-stretch',name:'Archon Stretch',displayName:'Архонтовое растяжение',category:'archon',stat:'range',value:45,maxRank:5,polarity:'V',special:'Нанесение электрического урона способностью восстанавливает энергию со временем.'},
+ {id:'archon-flow',name:'Archon Flow',displayName:'Архонтовый поток',category:'archon',stat:'energy',value:185,maxRank:5,polarity:'V',special:'Убийства замороженных врагов дают шанс создать сферу энергии; убийства замороженных врагов дают шанс создать сферу энергии.'},
+ {id:'archon-vitality',name:'Archon Vitality',displayName:'Архонтовая живучесть',category:'archon',stat:'health',value:100,maxRank:10,polarity:'D',special:'Эффекты статуса тепла от способностей применяются дважды.'},
+ {id:'scattered-justice',name:'Scattered Justice',displayName:'Рассеянное правосудие',category:'syndicate',stat:'multishot',value:200,maxRank:3,polarity:'V',special:'Аугмент исключительно для дробовика Hek; также активирует синдикатский эффект Правосудие.'},
+ {id:'amalgam-serration',name:'Amalgam Serration',displayName:'Амальгамная зазубрина',category:'weapon',stat:'damage',value:155,maxRank:10,polarity:'V',special:'Дополнительный бонус к скорости спринта; модификация оружия.'},
+ {id:'amalgam-barrel-diffusion',name:'Amalgam Barrel Diffusion',displayName:'Амальгамная диффузия ствола',category:'weapon',stat:'multishot',value:110,maxRank:5,polarity:'V',special:'Дополнительная скорость переката; модификация вторичного оружия.'},
+ {id:'amalgam-organ-shatter',name:'Amalgam Organ Shatter',displayName:'Амальгамное разрушение органов',category:'weapon',stat:'critDamage',value:85,maxRank:5,polarity:'V',special:'Дополнительная скорость тяжёлой атаки; модификация оружия ближнего боя.'},
+ {id:'amalgam-shotgun-spazz',name:'Amalgam Shotgun Spazz',displayName:'Амальгамный дробовой залп',category:'weapon',stat:'multishot',value:90, maxRank:5,polarity:'V',special:'Дополнительная скорость перезарядки дробовика.'}
+]);
+let settings=read(K.settings,{width:460,height:900,font:'Segoe UI',fontSize:13,bg:'#0d1117',surface:'#161b22',text:'#e6edf3',accent:'#58a6ff'});
+builds=builds.map(b=>({...b,type:b.type==='weapon'?'primary':(b.type||'warframe')}));
+let editingBuild=null, currentBuild=null;
+const modRuNames={'Intensify':'Усиление','Continuity':'Непрерывность','Stretch':'Растяжение','Streamline':'Рационализация','Vitality':'Живучесть','Steel Fiber':'Стальное волокно','Serration':'Зазубрины','Point Strike':'Точный выстрел','Vital Sense':'Чутьё на слабые места','Rifle Aptitude':'Меткость винтовки','Augur Secrets':'Секреты аугура','Blind Rage':'Слепая ярость','Transient Fortitude':'Мимолётная стойкость','Overextended':'Чрезмерное расширение','Narrow Minded':'Узколобость','Primed Continuity':'Праймовая непрерывность','Adaptation':'Адаптация','Rolling Guard':'Перекат с защитой','Hunter Adrenaline':'Адреналин охотника','Galvanized Chamber':'Гальванизированный патронник','Galvanized Aptitude':'Гальванизированная меткость','Galvanized Scope':'Гальванизированный прицел','Galvanized Savvy':'Гальванизированная смекалка','Galvanized Acceleration':'Гальванизированное ускорение','Galvanized Diffusion':'Гальванизированная диффузия','Archon Intensify':'Архонтовое усиление','Archon Continuity':'Архонтовая непрерывность','Archon Stretch':'Архонтовое растяжение','Archon Flow':'Архонтовый поток','Archon Vitality':'Архонтовая живучесть','Amalgam Serration':'Амальгамная зазубрина','Amalgam Barrel Diffusion':'Амальгамная диффузия ствола','Amalgam Organ Shatter':'Амальгамное разрушение органов','Amalgam Shotgun Spazz':'Амальгамный дробовой залп'};
+const polarityNames={'—':'Нейтральная','V':'Мадарай (V)','D':'Вазарин (D)','= ':'Зенурик (=)','=':'Зенурик (=)','Umbra':'Умбра','Aura':'Аура','Exilus':'Эксилус'};
+const displayModName=m=>m.displayName||modRuNames[m.name]||m.name;
+const modCategoryNames={standard:'Обычные',galvanized:'Гальванизированные',archon:'Архонтовые',syndicate:'Синдикатские / аугменты',weapon:'Уникальные для оружия',other:'Другие специальные'};
+const defaultModCompat={'intensify':'Warframe','continuity':'Warframe','stretch':'Warframe','streamline':'Warframe','vitality':'Warframe','steel-fiber':'Warframe','serration':'Rifle','point-strike':'Rifle','vital-sense':'Rifle','status':'Rifle','galv-chamber':'Rifle','galv-aptitude':'Rifle','galv-scope':'Rifle','galv-savy':'Shotgun','galv-acceleration':'Shotgun','galv-diffusion':'Pistol','archon-intensify':'Warframe','archon-continuity':'Warframe','archon-stretch':'Warframe','archon-flow':'Warframe','archon-vitality':'Warframe','scattered-justice':'Hek','amalgam-serration':'Rifle','amalgam-barrel-diffusion':'Pistol','amalgam-organ-shatter':'Melee','amalgam-shotgun-spazz':'Shotgun'};
+mods.forEach(m=>{if(!m.compatName&&defaultModCompat[m.id])m.compatName=defaultModCompat[m.id]});
+const extraSeedMods=mods.slice(10);
+mods=[...mods,...read(K.mods,[]).filter(x=>!mods.some(m=>m.id===x.id))];
+extraSeedMods.forEach(m=>{if(!mods.some(x=>x.id===m.id))mods.push(m)});
+(savedCatalog.mods||[]).forEach(m=>{if(!mods.some(x=>x.id===m.id))mods.push(m)});
+let remoteWarframes=savedCatalog.warframes||[],remoteWeapons=savedCatalog.weapons||[],remoteArchwings=savedCatalog.archwings||[],remoteCompanions=savedCatalog.companions||[],remoteSentinelWeapons=savedCatalog.sentinelWeapons||[];
+let wfcdTranslations={};
+function categoryOf(m){return m.category||'standard'}
+const statNames={strength:'Сила способностей',energy:'Максимум энергии',duration:'Длительность',range:'Дальность',efficiency:'Эффективность',health:'Здоровье',shield:'Щиты',armor:'Броня',damage:'Урон',critChance:'Критический шанс',critDamage:'Критический множитель',status:'Шанс статуса',multishot:'Мультивыстрел'};
+function applySettings(){document.documentElement.style.setProperty('--bg',settings.bg);document.documentElement.style.setProperty('--surface',settings.surface);document.documentElement.style.setProperty('--text',settings.text);document.documentElement.style.setProperty('--accent',settings.accent);document.documentElement.style.setProperty('--app-font-size',settings.fontSize+'px');document.body.style.fontFamily='"'+settings.font+'",system-ui,sans-serif';document.body.style.fontSize=settings.fontSize+'px';}
+function loadSettingsUI(){for(const [id,key] of Object.entries({'setting-width':'width','setting-height':'height','setting-font':'font','setting-font-size':'fontSize','setting-bg':'bg','setting-surface':'surface','setting-text':'text','setting-accent':'accent'})){if($(id))$(id).value=settings[key]}$('font-size-label').textContent=settings.fontSize;}
+function setPage(page){document.querySelectorAll('.app-page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.app-nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===page));$(page+'-page').classList.add('active');$('footer').style.display=page==='tasks'?'flex':'none';$('summary').style.display=page==='tasks'?'flex':'none';if(page==='builds')renderBuildList();if(page==='settings')loadSettingsUI();}
+document.querySelectorAll('.app-nav-btn').forEach(b=>b.addEventListener('click',()=>setPage(b.dataset.page)));
+const buildTypeNames={warframe:'Варфрейм',primary:'Основное оружие',secondary:'Вторичное оружие',melee:'Ближний бой',archwing:'Арчвинг',archgun:'Арч-пушка',archmelee:'Арч-ближний бой',companion:'Спутник',sentinelweapon:'Оружие стража',weapon:'Оружие'};
+function isFrameBuild(type){return type==='warframe'||type==='archwing'||type==='companion'}
+function isWeaponBuild(type){return !isFrameBuild(type)}
+function renderBuildList(){ $('build-editor').style.display='none';$('mod-library').style.display='none';$('build-list').style.display='flex';$('build-list').innerHTML='';if(!builds.length){$('build-list').innerHTML='<div class="muted-small">Сохранённых сборок пока нет. Нажми «Создать сборку».</div>';return}builds.forEach(b=>{const el=document.createElement('div');el.className='build-card';el.innerHTML='<div><strong>'+esc(b.name)+'</strong><small>'+esc(buildTypeNames[b.type]||'Варфрейм')+' · '+esc(b.item||'Без названия')+'</small><div class="muted-small">'+esc(b.description||'')+'</div></div><div class="build-card-actions"><button class="btn edit">Изменить</button><button class="btn del">✕</button></div>';el.querySelector('.edit').onclick=()=>openBuild(b.id);el.querySelector('.del').onclick=()=>{if(confirm('Удалить эту сборку?')){builds=builds.filter(x=>x.id!==b.id);write(K.builds,builds);renderBuildList()}};$('build-list').appendChild(el)})}
+function defaultStats(type){return isWeaponBuild(type)?{damage:100,critChance:10,critDamage:2,status:10,multishot:1}:{health:370,shield:270,armor:225,energy:150,strength:100,duration:100,range:100,efficiency:100}}
+function openBuild(id){editingBuild=id||null;currentBuild=id?JSON.parse(JSON.stringify(builds.find(b=>b.id===id))):{id:'b'+Date.now(),name:'',type:'warframe',item:'',description:'',base:defaultStats('warframe'),slots:Array(8).fill(null)};if(!currentBuild.base)currentBuild.base=defaultStats(currentBuild.type);if(!currentBuild.slots)currentBuild.slots=Array(8).fill(null);$('build-list').style.display='none';$('build-editor').style.display='block';$('mod-library').style.display='none';$('build-editor-title').textContent=id?'Изменить сборку':'Новая сборка';$('build-name').value=currentBuild.name;$('build-type').value=currentBuild.type;$('build-item').value=currentBuild.item;$('build-description').value=currentBuild.description;fillBuildItemOptions();renderBaseInputs();renderSlots();calculate();}
+function renderBaseInputs(){const type=$('build-type').value;const base=currentBuild.base||defaultStats(type);if(isWeaponBuild(type)){const keys=['damage','critChance','critDamage','status','multishot'];$('base-stats').innerHTML=keys.map(k=>fieldStat(k,base[k]??0)).join('')}else{const keys=['health','shield','armor','energy','strength','duration','range','efficiency'];$('base-stats').innerHTML=keys.map(k=>fieldStat(k,base[k]??100)).join('')}document.querySelectorAll('[data-base]').forEach(i=>i.addEventListener('input',()=>{currentBuild.base=currentBuild.base||{};currentBuild.base[i.dataset.base]=Number(i.value)||0;calculate()}));}
+function fieldStat(k,v){return '<div class="field"><label>'+statNames[k]+'</label><input type="number" data-base="'+k+'" value="'+v+'" step="0.1"></div>'}
+function renderSlots(){const polarities=['—','V','D','=','Umbra','Aura','Exilus'];currentBuild.slots=currentBuild.slots.map(slot=>{if(!slot)return null;const selectedMod=mods.find(m=>m.id===slot.modId);return selectedMod&&isModCompatible(selectedMod)?slot:null});const availableMods=mods.filter(m=>m.selectable!==false&&isModCompatible(m));$('mod-slots').innerHTML=Array.from({length:8},(_,i)=>{const slot=currentBuild.slots[i]||{};return '<div class="mod-slot"><label>Слот '+(i+1)+'</label><select data-mod="'+i+'"><option value="">— Не выбрано —</option>'+availableMods.map(m=>'<option value="'+m.id+'" '+(slot.modId===m.id?'selected':'')+'>'+esc(displayModName(m)+' · '+(modCategoryNames[categoryOf(m)]||'Обычные'))+'</option>').join('')+'</select><div class="slot-meta"><select data-rank="'+i+'"><option value="">Уровень</option></select><select data-polarity="'+i+'">'+polarities.map(p=>'<option '+((slot.polarity||'—')===p?'selected':'')+'>'+p+'</option>').join('')+'</select></div><div class="muted-small" data-slot-effect="'+i+'"></div></div>'}).join('');currentBuild.slots.forEach((slot,i)=>{const m=mods.find(x=>x.id===slot?.modId);const sel=document.querySelector('[data-rank="'+i+'"]');if(m){for(let r=0;r<=m.maxRank;r++){const o=document.createElement('option');o.value=r;o.textContent='Уровень '+r;if(Number(slot.rank||0)===r)o.selected=true;sel.appendChild(o)}document.querySelector('[data-slot-effect="'+i+'"]').textContent=(Number(m.value)?(m.value*(Number(slot.rank||0)/Math.max(1,m.maxRank))).toFixed(1)+'% · ':'')+(polarityNames[m.polarity]||m.polarity||'Без полярности')+(m.compatName&&m.compatName!=='All'?' · Совместимость: '+displayCompat(m):'')+(m.special?' · '+m.special:'')}else{sel.innerHTML='<option value="0">Уровень —</option>'}});$('mod-slots').querySelectorAll('[data-mod]').forEach(s=>s.onchange=()=>{const i=+s.dataset.mod;const m=mods.find(x=>x.id===s.value);currentBuild.slots[i]=m?{modId:m.id,rank:0,polarity:m.polarity||'—'}:null;renderSlots();calculate()});$('mod-slots').querySelectorAll('[data-rank]').forEach(s=>s.onchange=()=>{const i=+s.dataset.rank;if(currentBuild.slots[i])currentBuild.slots[i].rank=+s.value;calculate()});$('mod-slots').querySelectorAll('[data-polarity]').forEach(s=>s.onchange=()=>{const i=+s.dataset.polarity;if(currentBuild.slots[i])currentBuild.slots[i].polarity=s.value;calculate()});}
+function calculate(){if(!currentBuild)return;const base=currentBuild.base||defaultStats(currentBuild.type),sum={};Object.keys(base).forEach(k=>sum[k]=0);currentBuild.slots.forEach(s=>{if(!s)return;const m=mods.find(x=>x.id===s.modId);if(m&&sum[m.stat]!==undefined)sum[m.stat]+=Number(m.value)*(Number(s.rank||0)/Math.max(1,m.maxRank))});$('calculated-stats').innerHTML=Object.keys(base).map(k=>{const before=Number(base[k])||0,bonus=sum[k]||0,after=before*(1+bonus/100),diff=bonus;return '<div class="stat-result"><span>'+statNames[k]+'</span><span>'+before.toFixed(1)+' → <b>'+after.toFixed(1)+'</b> <em class="'+(diff>=0?'stat-positive':'stat-negative')+'">'+(diff>=0?'+':'')+diff.toFixed(1)+'%</em></span></div>'}).join('');}
+$('new-build').onclick=()=>openBuild(null);$('close-build-editor').onclick=renderBuildList;$('cancel-build').onclick=renderBuildList;
+$('save-build').onclick=()=>{currentBuild.name=$('build-name').value.trim();currentBuild.type=$('build-type').value;currentBuild.item=$('build-item').value.trim();currentBuild.description=$('build-description').value.trim();if(!currentBuild.name||!currentBuild.item){alert('Укажи название сборки и выбери предмет.');return}if(editingBuild){const i=builds.findIndex(b=>b.id===editingBuild);if(i>=0)builds[i]=currentBuild}else builds.push(currentBuild);write(K.builds,builds);renderBuildList();showToast('Сборка сохранена')};
+$('manage-mods').onclick=()=>{ $('build-editor').style.display='none';$('mod-library').style.display='block';renderModLibrary()};$('close-mod-library').onclick=()=>{$('mod-library').style.display='none';$('build-editor').style.display='block';renderSlots()};
+function renderModLibrary(){const filter=$('mod-category-filter')?.value||'all';const shown=mods.filter(m=>isModCompatible(m)&&(filter==='all'||categoryOf(m)===filter));$('mod-library-list').innerHTML=shown.map(m=>'<div class="mod-library-row"><span><b>'+esc(displayModName(m))+'</b><br><span class="muted-small">'+(modCategoryNames[categoryOf(m)]||'Специальные')+' · '+(statNames[m.stat]||m.stat)+(Number(m.value)?' · '+(m.value>=0?'+':'')+m.value+'%':'')+' · максимальный уровень '+(m.maxRank??0)+' · '+(polarityNames[m.polarity]||m.polarity||'Без полярности')+(m.compatName&&m.compatName!=='All'?'<br>Совместимость: '+esc(displayCompat(m)):'')+(m.special?'<br>'+esc(m.special):'')+(m.rankStats&&m.rankStats.length?'<br>'+esc(m.rankStats.join(' · ')):'')+'</span></span>'+(m.source==='WFCD'?'':'<button class="btn" data-remove-mod="'+m.id+'">Удалить</button>')+'</div>').join('')||'<div class="muted-small">В этой категории пока нет модификаций.</div>';$('mod-library-list').querySelectorAll('[data-remove-mod]').forEach(b=>b.onclick=()=>{mods=mods.filter(m=>m.id!==b.dataset.removeMod);write(K.mods,mods);renderModLibrary()})}
+$('mod-category-filter').onchange=renderModLibrary;$('add-mod').onclick=()=>{const name=$('mod-name').value.trim(),value=Number($('mod-value').value),maxRank=Math.max(0,Math.min(10,Number($('mod-max-rank').value)));if(!name||!Number.isFinite(value)){alert('Укажи название модификации и её эффект.');return}mods.push({id:'m'+Date.now(),name,stat:$('mod-stat').value,value,maxRank,polarity:$('mod-polarity').value,compatName:$('mod-compatible').value||'All',category:'standard'});write(K.mods,mods);$('mod-name').value='';renderModLibrary();showToast('Модификация добавлена')};
+$('setting-font-size').oninput=()=>{$('font-size-label').textContent=$('setting-font-size').value};
+$('save-settings').onclick=()=>{settings={width:clamp($('setting-width').value,360,1200),height:clamp($('setting-height').value,500,1600),font:$('setting-font').value,fontSize:clamp($('setting-font-size').value,11,20),bg:$('setting-bg').value,surface:$('setting-surface').value,text:$('setting-text').value,accent:$('setting-accent').value};write(K.settings,settings);applySettings();if(window.chrome?.webview)window.chrome.webview.postMessage({type:'resize',width:settings.width,height:settings.height});showToast('Настройки применены')};
+$('reset-settings').onclick=()=>{settings={width:460,height:900,font:'Segoe UI',fontSize:13,bg:'#0d1117',surface:'#161b22',text:'#e6edf3',accent:'#58a6ff'};write(K.settings,settings);loadSettingsUI();applySettings();if(window.chrome?.webview)window.chrome.webview.postMessage({type:'resize',width:settings.width,height:settings.height})};
+function clamp(v,min,max){return Math.max(min,Math.min(max,Number(v)||min))}
+const GH_OWNER='q7vych',GH_REPO='w-tracker',GH_BRANCH='main';
+const GH_BASE='https://raw.githubusercontent.com/'+GH_OWNER+'/'+GH_REPO+'/'+GH_BRANCH+'/';
+const WFCD_BASE='https://raw.githubusercontent.com/WFCD/warframe-items/master/data/json/';
+function fillBuildItemOptions(){const list=$('build-item-options');if(!list)return;const type=$('build-type').value;const items=itemsForBuildType(type);list.innerHTML=items.map(x=>'<option value="'+esc(x.name||x.uniqueName||'')+'"></option>').join('')}
+$('build-type').addEventListener('change',()=>{if(!currentBuild)return;currentBuild.type=$('build-type').value;currentBuild.base=defaultStats(currentBuild.type);currentBuild.slots=Array(8).fill(null);$('build-item').value='';fillBuildItemOptions();renderBaseInputs();renderSlots();calculate()});
+async function fetchOptionalJson(paths){for(const path of paths){try{const r=await fetch(GH_BASE+path,{cache:'no-cache'});if(r.ok)return await r.json()}catch(e){}}return null}
+function translatedItem(item,dict){const t=(dict&&dict[item.uniqueName])||item.i18n?.ru||{};return {...item,_ru:t,_nameRu:t.name||item.name,_descriptionRu:t.description||item.description||'',_passiveRu:t.passiveDescription||item.passiveDescription||'',_abilitiesRu:t.abilities||item.abilities||[]}}
+function modCategory(item){const n=(item.name||'').toLowerCase(),c=(item.compatName||'').toLowerCase();if(n.includes('galvanized'))return 'galvanized';if(n.includes('archon'))return 'archon';const syndicateTags=(item.tags||[]).some(t=>/syndicate|steel meridian|arbiters|cephalon|new loka|perrin|red veil/i.test(t));if(item.isAugment||syndicateTags||/syndicate|augment/.test(n))return 'syndicate';const generic=['all','warframe','rifle','shotgun','pistol','secondary','primary','melee','archwing','arch-gun','arch-melee','companion','sentinel','kubrow','kavat','beast','robotic','necramech','parazon','stance','aura','exilus','archwing mod','melee mod','primary mod','secondary mod','shotgun mod','sentinel mod','companion mod'];if(n.includes('amalgam')||(c&& !generic.includes(c)))return 'weapon';return 'standard'}
+function inferModStat(name,statsText,description){const x=(name+' '+statsText+' '+description).toLowerCase();const rules=[['multishot',/multishot|мультивыстрел/],['critChance',/critical chance|crit chance|критическ.{0,12} шанс/],['critDamage',/critical damage|critical multiplier|критическ.{0,12}(урон|множител)/],['status',/status chance|статус.{0,12}шанс/],['strength',/ability strength|power strength|сила способност/],['duration',/ability duration|длительность способност/],['range',/ability range|дальность способност/],['efficiency',/ability efficiency|эффективность способност/],['health',/health|здоровь/],['armor',/armor|брон/],['energy',/energy|энерг/],['damage',/damage|урон/]];for(const [k,re] of rules)if(re.test(x))return k;return ''}
+function parsePercent(text){const m=String(text||'').match(/[+−-]?\s*(\d+(?:[.,]\d+)?)\s*%/);return m?Number(m[1].replace(',','.'))*(String(text).includes('−')?-1:1):0}
+function polarityCode(value){const v=String(value||'').toLowerCase();return ({madurai:'V',vazarin:'D',naramon:'=',zenurik:'=',umbra:'Umbra',penjaga:'Penjaga',unairu:'D',universal:'Универсальная',aura:'Aura'})[v]||'—'}
+function inferModCompat(m){const c=String(m.compatName||'').trim().toLowerCase(),t=String(m.type||m.rawType||'').trim().toLowerCase(),u=String(m.uniqueName||'').toLowerCase(),n=String(m.name||'').toLowerCase();if(c&&c!=='all')return c;if(t&&t!=='mod'&&t!=='modification'&&t!=='mod card')return t;const rules=[[/\/mods\/archwing\/melee|arch-melee mod/,'arch-melee mod'],[/\/mods\/archwing\/|arch-gun mod/,'arch-gun mod'],[/\/mods\/archwing|archwing mod/,'archwing mod'],[/\/mods\/(warframe|aura)|powersuits\/.*augment|augmentcard/,'warframe mod'],[/\/mods\/sentinel|sentinels\/.*precept|sentinel mod/,'sentinel mod'],[/\/pets\/.*precept|kubrow.*mod|kavat.*mod|companion.*mod/,'companion mod'],[/\/mods\/(rifle|shotgun)|dualsource\/(rifle|shotgun)|rifle mod|shotgun mod/,'primary mod'],[/\/mods\/pistol|dualsource\/pistol|pistol mod/,'secondary mod'],[/\/mods\/melee|dualsource\/melee|melee mod|stances/,'melee mod'],[/riven mod$/,'all']];for(const [re,v] of rules)if(re.test(u+' '+t+' '+n))return v;return ''}
+function normalizeWFCDMod(raw,dict){const item=translatedItem(raw,dict),levels=item._ru.levelStats||raw.levelStats||[],last=levels.length?levels[levels.length-1]:null,rankStats=last?.stats||[],statsText=rankStats.join(' · '),description=item._descriptionRu||'',name=raw.name||raw.uniqueName;const maxRank=Number(raw.fusionLimit??Math.max(0,levels.length-1));const stat=inferModStat(name,statsText,description);const value=parsePercent(statsText);const inferredCompat=inferModCompat(raw);return {id:'wfcd:'+raw.uniqueName,uniqueName:raw.uniqueName,name,displayName:item._nameRu||modRuNames[name]||name,originalName:name,category:modCategory({...raw,compatName:inferredCompat}),stat,value,maxRank,polarity:polarityCode(raw.polarity),rarity:raw.rarity||'',compatName:inferredCompat,type:raw.type||'',special:description,rankStats,allRankStats:levels.map(x=>x.stats||[]),selectable:true,source:'WFCD',isAugment:!!raw.isAugment,baseDrain:raw.baseDrain??null,rawType:raw.type||''}}
+function normalizeFrame(raw,dict){const i=translatedItem(raw,dict);return {uniqueName:raw.uniqueName,name:i._nameRu||raw.name,originalName:raw.name,health:raw.health||0,shield:raw.shield||0,armor:raw.armor||0,energy:raw.power||0,sprint:raw.sprintSpeed||raw.sprint||1,polarities:raw.polarities||[],isPrime:!!raw.isPrime,description:i._descriptionRu,passive:i._passiveRu,abilities:i._abilitiesRu}}
+function sumDamage(item){if(Number.isFinite(item.totalDamage))return item.totalDamage;if(Array.isArray(item.damagePerShot))return item.damagePerShot.reduce((a,b)=>a+(Number(b)||0),0);if(typeof item.damage==='number')return item.damage;if(typeof item.damage==='string'){const n=Number(item.damage);if(Number.isFinite(n))return n}return 0}
+function normalizeWeapon(raw,dict,sourceCategory){const i=translatedItem(raw,dict);const pct=v=>{const n=Number(v)||0;return n<=1?n*100:n};return {uniqueName:raw.uniqueName,name:i._nameRu||raw.name,originalName:raw.name,category:raw.category,sourceCategory:sourceCategory||raw.category,weaponType:raw.type||'',damage:sumDamage(raw),critChance:pct(raw.criticalChance),critDamage:Number(raw.criticalMultiplier)||0,status:pct(raw.procChance??raw.statusChance),multishot:Number(raw.multishot)||1,fireRate:Number(raw.fireRate)||0,magazine:Number(raw.magazineSize)||0,reload:Number(raw.reloadTime)||0,damageTypes:raw.damageTypes||{},description:i._descriptionRu,masteryReq:raw.masteryReq||0,isPrime:!!raw.isPrime,compatName:raw.compatName||''}}
+const compatAliases={warframe:['warframe','warframe mod','aura','aura mod','exilus','exilus mod'],primary:['primary','primary mod','rifle','rifle mod','rifle riven mod','shotgun','shotgun mod','shotgun riven mod'],secondary:['secondary','secondary mod','pistol','pistol mod','pistol riven mod'],melee:['melee','melee mod','melee riven mod','stance','stance mod'],archwing:['archwing','archwing mod'],archgun:['arch-gun','arch-gun mod','archwing gun','arch-gun riven mod'],archmelee:['arch-melee','arch-melee mod'],companion:['companion','companion mod','companion weapon','companion weapon riven mod','creature mod','kubrow','kubrow mod','kavat','kavat mod','beast','robotic','pets','sentinel','sentinel mod'],sentinelweapon:['sentinel','sentinel mod','sentinel weapon','companion weapon','companion weapon riven mod'],parazon:['parazon','parazon mod'],necramech:['necramech','necramech mod']};
+const weaponSubtypeCompat=['bow','crossbow','launcher','sniper rifle','speargun','shotgun sidearm','dual pistols','blade and whip','claws','dagger','dual daggers','dual swords','fist','glaive','gunblade','hammer','heavy blade','machete','nikana','nunchaku','polearm','rapier','scythe','sparring','staff','sword','sword and shield','tonfa','warfan','whip'];
+const compatRu={'all':'Все предметы','warframe mod':'Моды варфрейма','primary mod':'Моды основного оружия','secondary mod':'Моды вторичного оружия','melee mod':'Моды ближнего боя','archwing mod':'Моды арчвинга','arch-gun mod':'Моды арч-пушки','arch-melee mod':'Моды арч-ближнего боя','companion mod':'Моды спутников','sentinel mod':'Моды стражей','warframe':'Варфрейм','aura':'Аура','exilus':'Эксилус','primary':'Основное оружие','rifle':'Винтовка','shotgun':'Дробовик','secondary':'Вторичное оружие','pistol':'Пистолет','melee':'Ближний бой','stance':'Стойка','archwing':'Арчвинг','arch-gun':'Арч-пушка','arch-melee':'Арч-ближний бой','companion':'Спутник','sentinel':'Страж','parazon':'Паразон','necramech':'Некрамех','kubrow':'Куброу','kavat':'Кават','bow':'Лук','crossbow':'Арбалет','launcher':'Пусковая установка','sniper rifle':'Снайперская винтовка','speargun':'Гарпунное ружьё','glaive':'Глефа','nikana':'Никана'};
+function displayCompat(m){const c=String(m.compatName||'').toLowerCase();return compatRu[c]||m.compatName||m.type||'Без ограничений'}
+function isModCompatible(m){const c=String(m.compatName||'').trim().toLowerCase(),t=String(m.type||m.rawType||'').trim().toLowerCase(),buildType=currentBuild?.type||$('build-type').value;const selected=String($('build-item').value||'').trim().toLowerCase();if(c==='all')return true;const compat=c||t;if(!compat)return true;const allowed=compatAliases[buildType]||[];if(allowed.includes(compat))return true;if(weaponSubtypeCompat.includes(compat)){const chosen=allBuildItems().find(x=>[x.name,x.originalName,x.uniqueName].filter(Boolean).some(v=>String(v).toLowerCase()===selected));return !!chosen&&String(chosen.weaponType||'').toLowerCase()===compat;}const chosen=allBuildItems().find(x=>[x.name,x.originalName,x.uniqueName].filter(Boolean).some(v=>String(v).toLowerCase()===selected));const specific=[chosen?.name,chosen?.originalName,chosen?.uniqueName].filter(Boolean).map(x=>x.toLowerCase());return specific.includes(compat);}
+function allBuildItems(){return [...remoteWarframes,...remoteWeapons,...remoteArchwings,...remoteCompanions,...remoteSentinelWeapons];}
+function findWFCDItem(name,list){const n=String(name||'').toLowerCase();return list.find(x=>x.name.toLowerCase()===n||x.originalName?.toLowerCase()===n||x.uniqueName?.toLowerCase()===n)}
+function itemsForBuildType(type){if(type==='warframe')return remoteWarframes;if(type==='archwing')return remoteArchwings;if(type==='companion')return remoteCompanions;if(type==='sentinelweapon')return remoteSentinelWeapons;const cats={primary:['Primary'],secondary:['Secondary'],melee:['Melee'],archgun:['Arch-Gun'],archmelee:['Arch-Melee']};return remoteWeapons.filter(x=>(cats[type]||[]).includes(x.sourceCategory||x.category));}
+function applySelectedItemStats(){if(!currentBuild)return;const name=$('build-item').value;let found;if(currentBuild.type==='warframe')found=findWFCDItem(name,remoteWarframes);else if(currentBuild.type==='archwing')found=findWFCDItem(name,remoteArchwings);else if(currentBuild.type==='companion')found=findWFCDItem(name,remoteCompanions);else if(currentBuild.type==='sentinelweapon')found=findWFCDItem(name,remoteSentinelWeapons);else found=findWFCDItem(name,itemsForBuildType(currentBuild.type));if(!found)return;if(isWeaponBuild(currentBuild.type)){currentBuild.base={damage:found.damage,critChance:found.critChance,critDamage:found.critDamage,status:found.status,multishot:found.multishot}}else{currentBuild.base={health:found.health||0,shield:found.shield||0,armor:found.armor||0,energy:found.energy||found.power||0,strength:100,duration:100,range:100,efficiency:100}}renderBaseInputs();renderSlots();calculate();}
+$('build-item').addEventListener('change',applySelectedItemStats);
+async function fetchWFCD(path){const r=await fetch(WFCD_BASE+path,{cache:'no-cache'});if(!r.ok)throw new Error(path+' — HTTP '+r.status);return await r.json()}
+async function updateWFCD(status){status.textContent='Получение игровых каталогов WFCD и русских переводов…';const names=['Mods.json','Warframes.json','Primary.json','Secondary.json','Melee.json','Arch-Gun.json','Arch-Melee.json','Archwing.json','Pets.json','Sentinels.json','SentinelWeapons.json'];const results=await Promise.allSettled([...names.map(fetchWFCD),fetchWFCD('i18n/ru.json')]);const raw={};names.forEach((n,i)=>{if(results[i].status==='fulfilled')raw[n]=results[i].value});const dict=results[names.length].status==='fulfilled'?results[names.length].value:{};wfcdTranslations=dict;const missing=names.filter(n=>!raw[n]);if(!raw['Mods.json']||!raw['Warframes.json'])throw new Error('WFCD не вернул обязательные каталоги: '+missing.join(', '));const sourceMods=raw['Mods.json'];const normalizedMods=sourceMods.map(x=>normalizeWFCDMod(x,dict));const frameData=raw['Warframes.json'].map(x=>normalizeFrame(x,dict));const weaponFiles=['Primary.json','Secondary.json','Melee.json','Arch-Gun.json','Arch-Melee.json','SentinelWeapons.json'];const weaponData=weaponFiles.flatMap(n=>(raw[n]||[]).map(x=>normalizeWeapon(x,dict,n.replace('.json',''))));const seen=new Set();remoteWeapons=weaponData.filter(x=>{if(!x.uniqueName||seen.has(x.uniqueName))return false;seen.add(x.uniqueName);return true}).sort((a,b)=>a.name.localeCompare(b.name,'ru'));remoteWarframes=frameData.sort((a,b)=>a.name.localeCompare(b.name,'ru'));remoteArchwings=(raw['Archwing.json']||[]).map(x=>normalizeFrame(x,dict)).sort((a,b)=>a.name.localeCompare(b.name,'ru'));remoteCompanions=[...(raw['Pets.json']||[]),...(raw['Sentinels.json']||[])].map(x=>normalizeWeapon(x,dict,'Companions')).sort((a,b)=>a.name.localeCompare(b.name,'ru'));remoteSentinelWeapons=(raw['SentinelWeapons.json']||[]).map(x=>normalizeWeapon(x,dict,'SentinelWeapons')).sort((a,b)=>a.name.localeCompare(b.name,'ru'));const localCustom=mods.filter(x=>!String(x.id).startsWith('wfcd:'));mods=[...normalizedMods,...localCustom];savedCatalog={mods:normalizedMods,warframes:remoteWarframes,weapons:remoteWeapons,archwings:remoteArchwings,companions:remoteCompanions,sentinelWeapons:remoteSentinelWeapons,updatedAt:new Date().toISOString(),sourceVersion:'WFCD master'};try{write(CATALOG_KEY,savedCatalog);write(K.mods,localCustom)}catch(e){console.warn('Каталог не удалось сохранить локально',e)}fillBuildItemOptions();if(currentBuild){renderSlots();calculate()}if($('mod-library').style.display==='block')renderModLibrary();status.textContent='WFCD: '+normalizedMods.length+' модов, '+remoteWarframes.length+' варфреймов, '+remoteWeapons.length+' единиц оружия, '+remoteArchwings.length+' арчвингов, '+remoteCompanions.length+' спутников. Русский перевод из ru.json: '+(Object.keys(dict).length?'загружен':'не получен')+'.'+(missing.length?' Не загрузились: '+missing.join(', ')+'.':'');}
+async function updateTasksFromGithub(){
+  const status=$('github-status');
+  const url='https://raw.githubusercontent.com/q7vych/w-tracker/main/tasks.json';
+  status.textContent='Загрузка заданий из q7vych/w-tracker…';
+  try{
+    // Используем именно raw.githubusercontent.com. Читаем сначала text(),
+    // а затем JSON.parse — так ошибка будет видна отдельно от HTTP-ошибки.
+    const response=await fetch(url,{method:'GET',cache:'no-store',headers:{'Accept':'application/json,text/plain,*/*'}});
+    const httpInfo='HTTP '+response.status+' '+(response.statusText||'OK');
+    if(!response.ok) throw new Error(httpInfo);
+    const rawText=await response.text();
+    if(!rawText || !rawText.trim()) throw new Error(httpInfo+', но GitHub вернул пустой ответ');
+
+    let remoteTasks;
+    try{
+      remoteTasks=JSON.parse(rawText.replace(/^\uFEFF/,''));
+    }catch(parseError){
+      throw new Error(httpInfo+', но тело ответа не является JSON: '+(parseError.message||parseError));
+    }
+
+    if(!remoteTasks || typeof remoteTasks!=='object'){
+      throw new Error('GitHub вернул JSON не в виде объекта');
+    }
+    if(!Array.isArray(remoteTasks.daily) || !Array.isArray(remoteTasks.weekly)){
+      throw new Error('В tasks.json отсутствуют массивы daily/weekly');
+    }
+
+    const previous=loadData();
+    const next=normalizeData({
+      daily:remoteTasks.daily,
+      weekly:remoteTasks.weekly,
+      done:previous.done,
+      periods:remoteTasks.periods || previous.periods
+    });
+
+    // Сохраняем отметки выполненных заданий только по совпадающим ID.
+    next.done={};
+    next.daily.concat(next.weekly).forEach(function(t){
+      if(previous.done[t.id]) next.done[t.id]=true;
+    });
+
+    resetExpiredPeriods(next);
+    saveData(next);
+    render();
+    status.textContent='Задания обновлены из GitHub: '+next.daily.length+' ежедневных и '+next.weekly.length+' еженедельных.';
+    showToast('Задания загружены из GitHub');
+  }catch(e){
+    console.error('GitHub tasks update failed:',e);
+    const reason=e && e.message ? e.message : String(e);
+    status.textContent='Не удалось обновить tasks.json: '+reason+'. Локальные задания не изменены.';
+    showToast('Ошибка загрузки заданий');
+  }
+}
+$('github-check').onclick=updateTasksFromGithub;
+$('file-update-check').onclick=()=>{const status=$('file-update-status');status.textContent='Запрос проверки…';if(window.chrome?.webview)window.chrome.webview.postMessage({type:'checkFileUpdates'});else status.textContent='Проверка доступна только в приложении Warframe Tracker.'};
+
+
+write(K.mods,mods.filter(m=>!String(m.id).startsWith('wfcd:')));fillBuildItemOptions();applySettings();loadSettingsUI();
+
+if(window.chrome?.webview)window.chrome.webview.postMessage({type:'resize',width:settings.width,height:settings.height});
+})();
+</script>
+
+</body>
+</html>
