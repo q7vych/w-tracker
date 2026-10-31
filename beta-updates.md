@@ -1,4 +1,3 @@
-[Скачать beta-v1.0.8.1]([url](https://github.com/q7vych/w-tracker/releases/tag/beta_version_v1.0.8.1))
 ### W_Tracker в Beta версии 1.0.8.1
  
 ### Исправления
