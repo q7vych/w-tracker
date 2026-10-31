@@ -490,6 +490,7 @@
   .live-card .live-card-eta{font-size:calc(var(--app-font-size,13px)*.85)!important}
   #tasks-page .tasks{min-height:0}
   .task-extra span{display:inline-block;margin-right:8px}
+
   @media(max-width:390px){.mod-slots{grid-template-columns:1fr}.settings-grid{grid-template-columns:1fr 1fr}}
 
 </style>
@@ -499,7 +500,7 @@
     <div class="header">
       <div class="logo">
         <div class="logo-icon">W</div>
-        <span>Tracker v1.0.8.1<br>by Q7VYCH<br><a href="https://twitch.tv/q7vych" class="twitch-link" target="_blank">Twitch</a> · <a href="https://discord.com/invite/jErf968AAu" class="twitch-link" target="_blank">Discord</a></span>
+        <span>Tracker v1.0.8.2<br>by Q7VYCH<br><a href="https://twitch.tv/q7vych" class="twitch-link" target="_blank">Twitch</a> · <a href="https://discord.com/invite/jErf968AAu" class="twitch-link" target="_blank">Discord</a></span>
       </div>
       <div class="tabs">
         <div class="tab active" data-tab="daily">Ежедн.</div>
@@ -849,27 +850,45 @@ function closeModal() {
 
 /* ===== LIVE API ===== */
 function formatEta(eta) {
-  if (!eta) return "—";
+  if (eta === null || eta === undefined || eta === "") return "—";
   var s = String(eta).trim();
   if (!s) return "—";
-  s = s.replace(/\\s*ago$/i, "").trim();
-  s = s.replace(/(\\d+)d/g, "$1д");
-  s = s.replace(/(\\d+)h/g, "$1ч");
-  s = s.replace(/(\\d+)m/g, "$1м");
-  s = s.replace(/(\\d+)s/g, "").replace(/\\s{2,}/g, " ").trim();
-  return s || "—";
+  s = s.replace(/\s*ago$/i, "").trim();
+  s = s.replace(/(\d+)d\b/gi, "$1д");
+  s = s.replace(/(\d+)h\b/gi, "$1ч");
+  s = s.replace(/(\d+)m\b/gi, "$1м");
+  s = s.replace(/(\d+)s\b/gi, "$1с");
+  return s.replace(/\s{2,}/g, " ").trim() || "—";
 }
 
 function etaFromExpiry(expiry) {
   if (!expiry) return "";
-  var ms = new Date(expiry).getTime() - Date.now();
-  if (isNaN(ms) || ms <= 0) return "истекло";
-  var d = Math.floor(ms / 86400000);
-  var h = Math.floor((ms % 86400000) / 3600000);
-  var m = Math.floor((ms % 3600000) / 60000);
+  var expiryMs = typeof expiry === "number" ? expiry : new Date(expiry).getTime();
+  // API timestamps can be Unix seconds or milliseconds.
+  if (typeof expiry === "number" && expiry < 100000000000) expiryMs *= 1000;
+  var ms = expiryMs - Date.now();
+  if (!Number.isFinite(ms)) return "";
+  if (ms <= 0) return "истекло";
+  var totalSeconds = Math.floor(ms / 1000);
+  var d = Math.floor(totalSeconds / 86400);
+  var h = Math.floor((totalSeconds % 86400) / 3600);
+  var m = Math.floor((totalSeconds % 3600) / 60);
+  var sec = totalSeconds % 60;
   if (d > 0) return d + "д " + h + "ч";
   if (h > 0) return h + "ч " + m + "м";
-  return m + "м";
+  if (m > 0) return m + "м " + sec + "с";
+  return sec + "с";
+}
+
+function liveEta(data, expiryField, fallbackFields) {
+  if (!data) return "—";
+  var expiryEta = etaFromExpiry(data[expiryField || "expiry"]);
+  if (expiryEta) return expiryEta;
+  for (var i = 0; i < (fallbackFields || ["eta"]).length; i++) {
+    var value = data[fallbackFields[i]];
+    if (value) return formatEta(value);
+  }
+  return "—";
 }
 
 function cardSortie(data) {
@@ -884,7 +903,7 @@ function cardSortie(data) {
   return '<div class="live-card">' +
     '<div class="live-card-header">' +
       '<div class="live-card-title">Вылазка</div>' +
-      '<div class="live-card-eta">' + esc(formatEta(data.eta) || etaFromExpiry(data.expiry)) + '</div>' +
+      '<div class="live-card-eta">' + esc(liveEta(data, "expiry", ["eta"])) + '</div>' +
     '</div>' +
     '<div class="live-boss">' + esc(data.boss || "") + (data.faction ? " · " + esc(data.faction) : "") + '</div>' +
     missions +
@@ -902,7 +921,7 @@ function cardArchon(data) {
   return '<div class="live-card">' +
     '<div class="live-card-header">' +
       '<div class="live-card-title">Охота на Архонта</div>' +
-      '<div class="live-card-eta">' + esc(formatEta(data.eta) || etaFromExpiry(data.expiry)) + '</div>' +
+      '<div class="live-card-eta">' + esc(liveEta(data, "expiry", ["eta"])) + '</div>' +
     '</div>' +
     '<div class="live-boss">' + esc(data.boss || "") + (data.faction ? " · " + esc(data.faction) : "") + '</div>' +
     missions +
@@ -923,7 +942,7 @@ function cardArbitration(data) {
   return '<div class="live-card">' +
     '<div class="live-card-header">' +
       '<div class="live-card-title">Арбитраж</div>' +
-      '<div class="live-card-eta">' + esc(formatEta(data.eta) || etaFromExpiry(data.expiry)) + '</div>' +
+      '<div class="live-card-eta">' + esc(liveEta(data, "expiry", ["eta"])) + '</div>' +
     '</div>' +
     '<div class="live-mission">' +
       '<div class="live-mission-type">' + esc(data.type || data.missionType || "—") + '</div>' +
@@ -960,7 +979,7 @@ function cardAlerts(list) {
     var reward = formatAlertReward(m);
     return '<div class="live-mission">' +
       '<div class="live-mission-type">' + esc(m.type || m.typeKey || "Миссия") +
-        ' <span style="color:var(--orange);font-weight:500">· ' + esc(etaFromExpiry(a.expiry)) + '</span>' +
+        ' <span style="color:var(--orange);font-weight:500">· ' + esc(liveEta(a, "expiry", ["eta"])) + '</span>' +
       '</div>' +
       '<div class="live-mission-node">' + esc(m.node || "—") +
         (m.faction ? " · " + esc(m.faction) : "") +
@@ -1016,7 +1035,7 @@ function cardFissures(list) {
     var tag = f.isHard ? "SP " : "";
     return '<div class="live-mission">' +
       '<div class="live-mission-type">' + tag + esc(f.tier || "") + " · " + esc(f.missionType || f.missionKey || "—") +
-        ' <span style="color:var(--orange);font-weight:500">· ' + esc(formatEta(f.eta) || etaFromExpiry(f.expiry)) + '</span>' +
+        ' <span style="color:var(--orange);font-weight:500">· ' + esc(liveEta(f, "expiry", ["eta"])) + '</span>' +
       '</div>' +
       '<div class="live-mission-node">' + esc(f.node || "—") + (f.enemy ? " · " + esc(f.enemy) : "") + '</div>' +
     '</div>';
@@ -1032,26 +1051,81 @@ function cardFissures(list) {
 
 function cardBaro(data) {
   if (!data) return "";
-  var active = data.active;
-  var eta = active ? (formatEta(data.endString) || etaFromExpiry(data.expiry)) : (formatEta(data.startString) || etaFromExpiry(data.activation));
+
+  var now = Date.now();
+
+  var activation = data.activation
+    ? new Date(data.activation).getTime()
+    : NaN;
+
+  var expiry = data.expiry
+    ? new Date(data.expiry).getTime()
+    : NaN;
+
+  var active = typeof data.active === "boolean"
+    ? data.active
+    : (!isNaN(activation) &&
+       !isNaN(expiry) &&
+       now >= activation &&
+       now < expiry);
+
+  var eta = active
+    ? liveEta(data, "expiry", ["endString"])
+    : liveEta(data, "activation", ["startString"]);
+
   var loc = data.location || "—";
-  var inv = (data.inventory || []).slice(0, 10);
-  var items = inv.map(function(it) {
+
+  var inventory = Array.isArray(data.inventory)
+    ? data.inventory
+    : [];
+
+  var items = inventory.map(function(it) {
+    var name = it.item ||
+               it.name ||
+               it.uniqueName ||
+               it.id ||
+               "Неизвестный товар";
+
     var price = [];
-    if (it.ducats) price.push(it.ducats + " дук.");
-    if (it.credits) price.push(Number(it.credits).toLocaleString("ru-RU") + " кр.");
+
+    if (it.ducats != null) {
+      price.push(Number(it.ducats).toLocaleString("ru-RU") + " дук.");
+    }
+
+    if (it.credits != null) {
+      price.push(Number(it.credits).toLocaleString("ru-RU") + " кр.");
+    }
+
     return '<div class="live-mission">' +
-      '<div class="live-mission-type">' + esc(it.item || it.id || "—") + '</div>' +
-      (price.length ? '<div class="live-mission-mod">' + esc(price.join(" / ")) + '</div>' : '') +
+      '<div class="live-mission-type">' +
+        esc(name) +
+      '</div>' +
+      (price.length
+        ? '<div class="live-mission-mod">' +
+            esc(price.join(" / ")) +
+          '</div>'
+        : '') +
     '</div>';
   }).join("");
+
   return '<div class="live-card">' +
     '<div class="live-card-header">' +
       '<div class="live-card-title">Баро КиТиир</div>' +
-      '<div class="live-card-eta">' + (active ? "уходит " : "через ") + esc(eta) + '</div>' +
+      '<div class="live-card-eta">' +
+        (active ? "уходит " : "через ") + esc(eta) +
+      '</div>' +
     '</div>' +
-    '<div class="live-boss">' + (active ? "Сейчас: " : "Прибудет: ") + esc(loc) + '</div>' +
-    (active && items ? items : (active ? "" : '<div class="live-mission-node">Ассортимент появится по прибытии</div>')) +
+
+    '<div class="live-boss">' +
+      (active ? "Сейчас: " : "Прибудет: ") +
+      esc(loc) +
+    '</div>' +
+
+    (active
+      ? (items ||
+          '<div class="live-mission-node">Товары не получены от API</div>')
+      : '<div class="live-mission-node">Ассортимент появится по прибытии</div>') +
+
   '</div>';
 }
 
@@ -1062,7 +1136,7 @@ function cardCycles(cetus, vallis, cambion) {
     if (typeof data.isDay === "boolean") state = data.isDay ? dayLabel : nightLabel;
     else if (data.state) state = data.state;
     else if (data.active) state = data.active;
-    var eta = formatEta(data.timeLeft) || formatEta(data.shortString) || etaFromExpiry(data.expiry);
+    var eta = liveEta(data, "expiry", ["timeLeft", "shortString"]);
     return '<div class="live-mission">' +
       '<div class="live-mission-type">' + esc(name) + " · " + esc(state || "—") + '</div>' +
       '<div class="live-mission-node">до смены: ' + esc(eta || "—") + '</div>' +
@@ -1084,13 +1158,13 @@ function cardCycles(cetus, vallis, cambion) {
 function cardSteelPath(data) {
   if (!data) return "";
   var reward = data.currentReward ? (data.currentReward.name + (data.currentReward.cost ? " · " + data.currentReward.cost + " med." : "")) : "—";
-  var left = formatEta(data.remaining) || etaFromExpiry(data.expiry);
+  var left = liveEta(data, "expiry", ["remaining"]);
   var inc = data.incursions;
   var incHtml = "";
   if (inc) {
     incHtml = '<div class="live-mission">' +
       '<div class="live-mission-type">Инкурсии</div>' +
-      '<div class="live-mission-node">до сброса: ' + esc(formatEta(inc.eta) || etaFromExpiry(inc.expiry)) + '</div>' +
+      '<div class="live-mission-node">до сброса: ' + esc(liveEta(inc, "expiry", ["eta"])) + '</div>' +
     '</div>';
   }
   return '<div class="live-card">' +
@@ -1125,10 +1199,34 @@ function cardNightwave(data) {
   return '<div class="live-card">' +
     '<div class="live-card-header">' +
       '<div class="live-card-title">Ночная волна ' + esc(season) + '</div>' +
-      '<div class="live-card-eta">' + esc(formatEta(data.eta) || etaFromExpiry(data.expiry)) + '</div>' +
+      '<div class="live-card-eta">' + esc(liveEta(data, "expiry", ["eta"])) + '</div>' +
     '</div>' +
     body +
   '</div>';
+}
+
+var liveDataCache = null;
+var liveCountdownTimer = null;
+
+function renderLiveData(results, requestErrors) {
+  var panel = document.getElementById("live-panel");
+  if (!panel || !results) return;
+  var html =
+    cardSortie(results[0]) +
+    cardArchon(results[1]) +
+    cardArbitration(results[2]) +
+    cardAlerts(results[3]) +
+    cardInvasions(results[4]) +
+    cardFissures(results[5]) +
+    cardBaro(results[6]) +
+    cardCycles(results[7], results[8], results[9]) +
+    cardSteelPath(results[10]) +
+    cardNightwave(results[11]);
+  if (!html) html = '<div class="live-status">Нет активных данных</div>';
+  if (requestErrors && requestErrors.length) {
+    html += '<div class="live-status" style="margin-top:8px">Не удалось загрузить: ' + esc(requestErrors.join(" · ")) + '</div>';
+  }
+  panel.innerHTML = html;
 }
 
 async function fetchLive() {
@@ -1139,23 +1237,13 @@ async function fetchLive() {
   try {
     var requestErrors = [];
     function get(path) {
-      // Сначала используем языковой маршрут API (/ru/{field}).
-      // Если он недоступен, пробуем платформенный endpoint с language=ru.
-      var localizedUrl = API_BASE + "/" + API_LANG + path;
-      var platformUrl = API_BASE + "/" + API_PLATFORM + path + "?language=" + encodeURIComponent(API_LANG);
-
-      function request(url) {
-        return fetch(url, { headers: { "Accept": "application/json", "Accept-Language": API_LANG } })
-          .then(function(r) {
-            if (!r.ok) throw new Error(url + " — HTTP " + r.status);
-            return r.json();
-          });
-      }
-
-      return request(localizedUrl).catch(function(firstError) {
-        console.warn("WarframeStatus localized endpoint failed:", localizedUrl, firstError);
-        return request(platformUrl);
-      }).catch(function(err) {
+      // Канонический маршрут WarframeStatus: /{platform}/{field}?language={lang}.
+      var url = API_BASE + "/" + API_LANG + path;
+      return fetch(url, { headers: { "Accept": "application/json", "Accept-Language": API_LANG } })
+        .then(function(r) {
+          if (!r.ok) throw new Error(url + " — HTTP " + r.status);
+          return r.json();
+        }).catch(function(err) {
         requestErrors.push(path + ": " + (err.message || err));
         console.error("WarframeStatus API:", path, err);
         return null;
@@ -1177,24 +1265,8 @@ async function fetchLive() {
       get("/nightwave")
     ]);
 
-    var html =
-      cardSortie(results[0]) +
-      cardArchon(results[1]) +
-      cardArbitration(results[2]) +
-      cardAlerts(results[3]) +
-      cardInvasions(results[4]) +
-      cardFissures(results[5]) +
-      cardBaro(results[6]) +
-      cardCycles(results[7], results[8], results[9]) +
-      cardSteelPath(results[10]) +
-      cardNightwave(results[11]);
-
-    if (!html) html = '<div class="live-status">Нет активных данных</div>';
-    if (requestErrors.length) {
-      html += '<div class="live-status" style="margin-top:8px">Не удалось загрузить: ' +
-        esc(requestErrors.join(" · ")) + '</div>';
-    }
-    panel.innerHTML = html;
+    liveDataCache = results;
+    renderLiveData(liveDataCache, requestErrors);
 
     var now = new Date();
     var timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
@@ -1209,13 +1281,22 @@ async function fetchLive() {
 function startLivePolling() {
   fetchLive();
   if (liveTimer) clearInterval(liveTimer);
+  if (liveCountdownTimer) clearInterval(liveCountdownTimer);
   liveTimer = setInterval(fetchLive, 60000);
+  // Пересчитываем оставшееся время по expiry локально, без повторного запроса к API.
+  liveCountdownTimer = setInterval(function() {
+    if (liveDataCache) renderLiveData(liveDataCache, []);
+  }, 1000);
 }
 
 function stopLivePolling() {
   if (liveTimer) {
     clearInterval(liveTimer);
     liveTimer = null;
+  }
+  if (liveCountdownTimer) {
+    clearInterval(liveCountdownTimer);
+    liveCountdownTimer = null;
   }
 }
 
