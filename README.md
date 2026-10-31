@@ -1,6 +1,5 @@
 <p align="center">
-  <a href="./docs/README.md"><b>🚀 Гайд по использованию</b></a> |
-  <a href="https://github.com/q7vych/w-tracker/releases/tag/beta_version_v1.0.8.1"><b>Beta Версии</b></a>
+  <a href="https://github.com/q7vych/w-tracker/releases/tag/beta_version_v1.0.8.1"><b>Beta v1.0.8.1</b></a>
 </p>
 
 ---
